@@ -1,0 +1,23 @@
+# Use the latest Node.js base image (v24)
+FROM node:24-bullseye
+
+# Install latest create-next-app globally
+RUN npm install -g create-next-app@latest
+
+# Install Docker using Docker's convenience script
+RUN apt-get update && \
+    apt-get install -y \
+    apt-transport-https \
+    ca-certificates \
+    curl \
+    gnupg2 \
+    lsb-release && \
+    curl -fsSL https://get.docker.com -o get-docker.sh && \
+    sh get-docker.sh && \
+    rm get-docker.sh
+
+# Add user to the Docker group
+RUN if getent group docker; then usermod -aG docker node; else groupadd docker && usermod -aG docker node; fi
+
+# Install latest Azure CLI (v2.75.0)
+RUN curl -sL https://aka.ms/InstallAzureCLIDeb | bash
