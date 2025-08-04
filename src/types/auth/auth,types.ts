@@ -16,7 +16,6 @@ export interface ProfileResponse {
   role: string;
 }
 
-
 export interface SignupResponse {
   message: string;
   user_id: string;
@@ -35,15 +34,13 @@ export interface LoginResponse {
   };
 }
 
-
 export interface ErrorResponse {
   detail: string;
 }
 
-
-export interface ApiResponse <T>
-{
+// API Response wrapper for consistent error handling
+export interface ApiResponse<T> {
   data?: T;
   error?: ErrorResponse;
-  status: number
+  status: number;
 }

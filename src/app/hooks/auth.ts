@@ -1,18 +1,21 @@
-"use client"
+'use client';
 import { apiClient } from '@/lib/api/auth-apiclient';
 import { LoginRequest, SignupRequest } from '@/types/auth/auth,types';
 import { useState, useEffect } from 'react';
 
 export function useAuth() {
   const [user, setUser] = useState<{ id: string; email: string } | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     // Check if user is logged in on mount
     const storedUser = apiClient.getUser();
-    setUser(storedUser);
-    setIsLoading(false);
+    const token = apiClient.getToken();
+    
+    if (token && storedUser) {
+      setUser(storedUser);
+    }
   }, []);
 
   const login = async (credentials: LoginRequest) => {
@@ -72,9 +75,10 @@ export function useAuth() {
   const logout = () => {
     apiClient.logout();
     setUser(null);
+    // logout() in apiClient already handles redirect
   };
 
-  const isAuthenticated = apiClient.isAuthenticated();
+  const isAuthenticated = !!apiClient.getToken();
 
   return {
     user,
