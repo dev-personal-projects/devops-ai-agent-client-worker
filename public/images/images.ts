@@ -1,0 +1,1 @@
+export {default as LoginImage} from './login-image.jpeg'
