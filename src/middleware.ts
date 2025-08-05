@@ -4,8 +4,9 @@ import type { NextRequest } from "next/server";
 
 // Public routes that don't require authentication
 const publicRoutes = [
-  "/login",
-  "/signup",
+  "/auth/login",
+  "/auth/signup",
+  "/auth/callback",
   "/forgot-password",
   "/reset-password",
 ];
@@ -17,7 +18,7 @@ const protectedRoutePatterns = [
   /^\/settings/,
 ];
 
-const LOGIN_ROUTE = "/login";
+const LOGIN_ROUTE = "/auth/login";
 const DASHBOARD_ROUTE = "/dashboard";
 const HOME_ROUTE = "/";
 
@@ -59,7 +60,7 @@ export function middleware(request: NextRequest) {
   // 3. Handle public routes (login, signup, etc.)
   if (publicRoutes.some((route) => pathname.startsWith(route))) {
     // If user is already authenticated and trying to access auth pages, redirect to dashboard
-    if (authToken && (pathname.startsWith("/login") || pathname.startsWith("/signup"))) {
+    if (authToken && (pathname.startsWith("/auth/login") || pathname.startsWith("/signup"))) {
       return NextResponse.redirect(new URL(DASHBOARD_ROUTE, request.url));
     }
     // Allow access to public routes

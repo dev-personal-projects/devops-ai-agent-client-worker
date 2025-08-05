@@ -31,6 +31,7 @@ export interface LoginResponse {
   user: {
     id: string;
     email: string;
+    fullName: string;
   };
 }
 
@@ -43,4 +44,14 @@ export interface ApiResponse<T> {
   data?: T;
   error?: ErrorResponse;
   status: number;
+}
+
+export interface OAuthInitiateResponse {
+  auth_url: string;
+  state: string;
+}
+
+export interface OAuthCallbackRequest {
+  code: string;
+  state: string;
 }

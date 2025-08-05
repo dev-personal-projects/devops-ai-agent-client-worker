@@ -1,4 +1,4 @@
-"use client"
+"use client";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
 import { useAuth } from "@/app/hooks/auth";
-import { LoginRequest } from "@/types/auth/auth,types";
+import { LoginRequest } from "@/types/auth/auth.types";
+import { useGitHubOAuth } from "@/app/hooks/useGitHubOAuth";
 
 const schema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -24,36 +25,46 @@ export function LoginForm({
 }: React.ComponentProps<"div">) {
   const router = useRouter();
   const { login, isLoading, error, clearError } = useAuth();
-  
+  const {
+    initiateGitHubLogin,
+    isLoading: githubLoading,
+    error: githubError,
+  } = useGitHubOAuth();
+
+  const handleGitHubLogin = async () => {
+    clearError();
+    await initiateGitHubLogin();
+  };
+
+  const displayError = error || githubError;  
+  const isSubmitting = isLoading || githubLoading;
+
   const {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<FormValues>({ 
+  } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    mode: "onBlur"
+    mode: "onBlur",
   });
 
   const onSubmit = async (data: FormValues) => {
     clearError();
-    
+
     const loginData: LoginRequest = {
       email: data.email,
       password: data.password,
     };
 
     const success = await login(loginData);
-    
+
     if (success) {
       router.push("/");
     }
   };
 
   return (
-    <div
-      className={cn("flex flex-col gap-6", className)}
-      {...props}
-    >
+    <div className={cn("flex flex-col gap-6", className)} {...props}>
       {/* Header */}
       <div className="flex flex-col items-center gap-2 text-center">
         <h1 className="text-2xl font-bold">Login to your account</h1>
@@ -67,11 +78,11 @@ export function LoginForm({
         {/* Email */}
         <div className="grid gap-3">
           <Label htmlFor="email">Email</Label>
-          <Input 
-            id="email" 
-            type="email" 
-            placeholder="m@example.com" 
-            {...register("email")} 
+          <Input
+            id="email"
+            type="email"
+            placeholder="m@example.com"
+            {...register("email")}
           />
           {errors.email && (
             <p className="text-xs text-red-500">{errors.email.message}</p>
@@ -82,30 +93,26 @@ export function LoginForm({
         <div className="grid gap-3">
           <div className="flex items-center">
             <Label htmlFor="password">Password</Label>
-            <Link 
-              href="/forgot-password" 
+            <Link
+              href="/forgot-password"
               className="ml-auto text-xs underline-offset-4 hover:underline"
             >
               Forgot?
             </Link>
           </div>
-          <Input 
-            id="password" 
-            type="password" 
-            {...register("password")} 
-          />
+          <Input id="password" type="password" {...register("password")} />
           {errors.password && (
             <p className="text-xs text-red-500">{errors.password.message}</p>
           )}
         </div>
 
         {/* Error Message */}
-        {error && (
-          <p className="text-sm text-red-600 text-center">{error}</p>
+        {displayError && (
+          <p className="text-sm text-red-600 text-center">{displayError}</p>
         )}
 
         {/* Submit Button */}
-        <Button type="submit" className="w-full" disabled={isLoading}>
+        <Button type="submit" className="w-full" disabled={isSubmitting}>
           {isLoading ? "Signing in…" : "Login"}
         </Button>
 
@@ -116,26 +123,22 @@ export function LoginForm({
           </span>
         </div>
 
-        {/* GitHub OAuth - Placeholder for now */}
-        <Button 
-          variant="outline" 
-          className="w-full" 
+        <Button
+          variant="outline"
+          className="w-full"
           type="button"
-          disabled={isLoading}
-          onClick={() => {
-            // TODO: Implement GitHub OAuth
-            console.log("GitHub OAuth not implemented yet");
-          }}
+          disabled={isSubmitting}
+          onClick={handleGitHubLogin}
         >
           <GitHubLogo className="mr-2 h-4 w-4" />
-          Login with GitHub
+          {githubLoading ? "Connecting..." : "Login with GitHub"}
         </Button>
       </form>
 
       {/* Footer */}
       <div className="text-center text-sm">
         Don&apos;t have an account?{" "}
-        <Link href="/signup" className="underline underline-offset-4">
+        <Link href="/auth/signup" className="underline underline-offset-4">
           Sign up
         </Link>
       </div>

@@ -3,10 +3,12 @@ import {
   ErrorResponse,
   LoginRequest,
   LoginResponse,
+  OAuthCallbackRequest,
+  OAuthInitiateResponse,
   ProfileResponse,
   SignupRequest,
   SignupResponse,
-} from "@/types/auth/auth,types";
+} from "@/types/auth/auth.types";
 
 // lib/api-client.ts
 class ApiClient {
@@ -90,6 +92,32 @@ class ApiClient {
     return response;
   }
 
+  async initiateGitHubOAuth(): Promise<ApiResponse<OAuthInitiateResponse>> {
+    return this.request<OAuthInitiateResponse>("/auth/oauth/github");
+  }
+
+  async handleGitHubCallback(payload: {
+    code: string;
+    state?: string;
+  }): Promise<ApiResponse<LoginResponse>> {
+    const response = await this.request<LoginResponse>(
+      "/auth/oauth/github/callback",
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }
+    );
+
+    // Store token if OAuth login successful
+    if (response.data && typeof window !== "undefined") {
+      this.token = response.data.access_token;
+      this.setToken(response.data.access_token);
+      this.setRefreshToken(response.data.refresh_token);
+      localStorage.setItem("user", JSON.stringify(response.data.user));
+    }
+
+    return response;
+  }
   async getProfile(userId: string): Promise<ApiResponse<ProfileResponse>> {
     return this.request<ProfileResponse>(`/auth/profile/${userId}`);
   }
@@ -141,7 +169,7 @@ class ApiClient {
         "refresh_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;";
 
       // Redirect to login
-      window.location.href = "/login";
+      window.location.href = "/auth/login";
     }
   }
 
@@ -150,7 +178,7 @@ class ApiClient {
     return !!this.token;
   }
   // Get stored user data
-  getUser(): { id: string; email: string } | null {
+  getUser(): { id: string; email: string; fullName: string } | null {
     if (typeof window !== "undefined") {
       const user = localStorage.getItem("user");
       return user ? JSON.parse(user) : null;

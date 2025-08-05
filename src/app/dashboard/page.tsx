@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "../hooks/auth";
 
 export default function DashboardPage() {
-  const { user, logout } = useAuth();
+  const {  user, logout } = useAuth();
 
   return (
     <div className="container mx-auto p-6">
@@ -20,8 +20,11 @@ export default function DashboardPage() {
         {user && (
           <div>
             <p>
-              <strong>Email:</strong> {user.email}
+              <strong>Full Name:</strong> {user.fullName}
             </p>
+            <p>
+              <strong>Email:</strong> {user.email}
+            </p>  
             <p>
               <strong>User ID:</strong> {user.id}
             </p>

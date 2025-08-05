@@ -1,4 +1,4 @@
-"use client"
+"use client";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
@@ -8,8 +8,9 @@ import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
-import { SignupRequest } from "@/types/auth/auth,types";
+import { SignupRequest } from "@/types/auth/auth.types";
 import { useAuth } from "@/app/hooks/auth";
+import { useGitHubOAuth } from "@/app/hooks/useGitHubOAuth";
 
 const schema = z.object({
   full_name: z.string().min(2, "Full name must be at least 2 characters"),
@@ -25,19 +26,33 @@ export function SignupForm({
 }: React.ComponentProps<"div">) {
   const router = useRouter();
   const { signup, isLoading, error, clearError } = useAuth();
-  
+  const {
+    initiateGitHubLogin,
+    isLoading: githubLoading,
+    error: githubError,
+  } = useGitHubOAuth();
+
+  const handleGitHubLogin = async () => {
+    clearError();
+    await initiateGitHubLogin();
+  };
+
+  // Show combined error from either regular login or GitHub OAuth
+  const displayError = error || githubError;
+  const isSubmitting = isLoading || githubLoading;
+
   const {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<FormValues>({ 
+  } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    mode: "onBlur"
+    mode: "onBlur",
   });
 
   const onSubmit = async (data: FormValues) => {
     clearError();
-    
+
     const signupData: SignupRequest = {
       email: data.email,
       password: data.password,
@@ -45,17 +60,14 @@ export function SignupForm({
     };
 
     const success = await signup(signupData);
-    
+
     if (success) {
       router.push("/login");
     }
   };
 
   return (
-    <div
-      className={cn("flex flex-col gap-6", className)}
-      {...props}
-    >
+    <div className={cn("flex flex-col gap-6", className)} {...props}>
       {/* Header */}
       <div className="flex flex-col items-center gap-2 text-center">
         <h1 className="text-2xl font-bold">Create your account</h1>
@@ -69,11 +81,11 @@ export function SignupForm({
         {/* Full Name */}
         <div className="grid gap-3">
           <Label htmlFor="full_name">Full Name</Label>
-          <Input 
-            id="full_name" 
-            type="text" 
-            placeholder="John Doe" 
-            {...register("full_name")} 
+          <Input
+            id="full_name"
+            type="text"
+            placeholder="John Doe"
+            {...register("full_name")}
           />
           {errors.full_name && (
             <p className="text-xs text-red-500">{errors.full_name.message}</p>
@@ -83,11 +95,11 @@ export function SignupForm({
         {/* Email */}
         <div className="grid gap-3">
           <Label htmlFor="email">Email</Label>
-          <Input 
-            id="email" 
-            type="email" 
-            placeholder="m@example.com" 
-            {...register("email")} 
+          <Input
+            id="email"
+            type="email"
+            placeholder="m@example.com"
+            {...register("email")}
           />
           {errors.email && (
             <p className="text-xs text-red-500">{errors.email.message}</p>
@@ -97,11 +109,11 @@ export function SignupForm({
         {/* Password */}
         <div className="grid gap-3">
           <Label htmlFor="password">Password</Label>
-          <Input 
-            id="password" 
+          <Input
+            id="password"
             type="password"
             placeholder="At least 6 characters"
-            {...register("password")} 
+            {...register("password")}
           />
           {errors.password && (
             <p className="text-xs text-red-500">{errors.password.message}</p>
@@ -109,8 +121,8 @@ export function SignupForm({
         </div>
 
         {/* Error Message */}
-        {error && (
-          <p className="text-sm text-red-600 text-center">{error}</p>
+        {displayError && (
+          <p className="text-sm text-red-600 text-center">{displayError}</p>
         )}
 
         {/* Submit Button */}
@@ -125,19 +137,15 @@ export function SignupForm({
           </span>
         </div>
 
-        {/* GitHub OAuth - Placeholder for now */}
-        <Button 
-          variant="outline" 
-          className="w-full" 
+        <Button
+          variant="outline"
+          className="w-full"
           type="button"
-          disabled={isLoading}
-          onClick={() => {
-            // TODO: Implement GitHub OAuth
-            console.log("GitHub OAuth not implemented yet");
-          }}
+          disabled={isSubmitting}
+          onClick={handleGitHubLogin}
         >
           <GitHubLogo className="mr-2 h-4 w-4" />
-          Sign up with GitHub
+          {githubLoading ? "Connecting..." : "Login with GitHub"}
         </Button>
       </form>
 

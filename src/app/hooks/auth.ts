@@ -1,10 +1,14 @@
-'use client';
-import { apiClient } from '@/lib/api/auth-apiclient';
-import { LoginRequest, SignupRequest } from '@/types/auth/auth,types';
-import { useState, useEffect } from 'react';
+"use client";
+import { apiClient } from "@/lib/api/auth-apiclient";
+import { LoginRequest, SignupRequest } from "@/types/auth/auth.types";
+import { useState, useEffect } from "react";
 
 export function useAuth() {
-  const [user, setUser] = useState<{ id: string; email: string } | null>(null);
+  const [user, setUser] = useState<{
+    id: string;
+    email: string;
+    fullName: string;
+  } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -12,7 +16,7 @@ export function useAuth() {
     // Check if user is logged in on mount
     const storedUser = apiClient.getUser();
     const token = apiClient.getToken();
-    
+
     if (token && storedUser) {
       setUser(storedUser);
     }
@@ -21,10 +25,10 @@ export function useAuth() {
   const login = async (credentials: LoginRequest) => {
     setIsLoading(true);
     setError(null);
-    
+
     try {
       const response = await apiClient.login(credentials);
-      
+
       if (response.error) {
         setError(response.error.detail);
         return false;
@@ -35,21 +39,21 @@ export function useAuth() {
         return true;
       }
     } catch (err) {
-      setError('Login failed. Please try again.');
+      setError("Login failed. Please try again.");
     } finally {
       setIsLoading(false);
     }
-    
+
     return false;
   };
 
   const signup = async (userData: SignupRequest) => {
     setIsLoading(true);
     setError(null);
-    
+
     try {
       const response = await apiClient.signup(userData);
-      
+
       if (response.error) {
         setError(response.error.detail);
         return false;
@@ -64,11 +68,11 @@ export function useAuth() {
         return loginSuccess;
       }
     } catch (err) {
-      setError('Signup failed. Please try again.');
+      setError("Signup failed. Please try again.");
     } finally {
       setIsLoading(false);
     }
-    
+
     return false;
   };
 
