@@ -6,11 +6,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { z } from "zod";
 import { useAuth } from "@/app/hooks/auth";
 import { LoginRequest } from "@/types/auth/auth.types";
 import { useGitHubOAuth } from "@/app/hooks/useGitHubOAuth";
+import { useState } from "react";
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger 
+} from "@/components/ui/dropdown-menu";
+import { ChevronDown } from "lucide-react";
+import { Alert, AlertDescription } from "./ui/alert";
 
 const schema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -24,19 +33,29 @@ export function LoginForm({
   ...props
 }: React.ComponentProps<"div">) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get("redirectTo") || "/dashboard";
+  
   const { login, isLoading, error, clearError } = useAuth();
   const {
     initiateGitHubLogin,
     isLoading: githubLoading,
     error: githubError,
+    clearError: clearGitHubError,
   } = useGitHubOAuth();
+  
+  const [showGitHubOptions, setShowGitHubOptions] = useState(false);
 
-  const handleGitHubLogin = async () => {
+  const handleGitHubLogin = async (forceAccountSelection: boolean = false) => {
     clearError();
-    await initiateGitHubLogin();
+    clearGitHubError();
+    await initiateGitHubLogin({ 
+      forceAccountSelection, 
+      redirectTo 
+    });
   };
 
-  const displayError = error || githubError;  
+  const displayError = error || githubError;
   const isSubmitting = isLoading || githubLoading;
 
   const {
@@ -59,7 +78,7 @@ export function LoginForm({
     const success = await login(loginData);
 
     if (success) {
-      router.push("/");
+      router.push(redirectTo);
     }
   };
 
@@ -67,11 +86,20 @@ export function LoginForm({
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       {/* Header */}
       <div className="flex flex-col items-center gap-2 text-center">
-        <h1 className="text-2xl font-bold">Login to your account</h1>
+        <h1 className="text-2xl font-bold">Welcome back</h1>
         <p className="text-muted-foreground text-sm">
-          Enter your email below to login
+          Enter your credentials to access your account
         </p>
       </div>
+
+      {/* Show redirect info */}
+      {searchParams.get("redirectTo") && (
+        <Alert>
+          <AlertDescription>
+            Please login to access that page
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Form */}
       <form onSubmit={handleSubmit(onSubmit)} className="grid gap-6">
@@ -82,6 +110,7 @@ export function LoginForm({
             id="email"
             type="email"
             placeholder="m@example.com"
+            autoComplete="email"
             {...register("email")}
           />
           {errors.email && (
@@ -94,13 +123,18 @@ export function LoginForm({
           <div className="flex items-center">
             <Label htmlFor="password">Password</Label>
             <Link
-              href="/forgot-password"
+              href="/auth/forgot-password"
               className="ml-auto text-xs underline-offset-4 hover:underline"
             >
-              Forgot?
+              Forgot password?
             </Link>
           </div>
-          <Input id="password" type="password" {...register("password")} />
+          <Input 
+            id="password" 
+            type="password" 
+            autoComplete="current-password"
+            {...register("password")} 
+          />
           {errors.password && (
             <p className="text-xs text-red-500">{errors.password.message}</p>
           )}
@@ -108,12 +142,14 @@ export function LoginForm({
 
         {/* Error Message */}
         {displayError && (
-          <p className="text-sm text-red-600 text-center">{displayError}</p>
+          <Alert variant="destructive">
+            <AlertDescription>{displayError}</AlertDescription>
+          </Alert>
         )}
 
         {/* Submit Button */}
         <Button type="submit" className="w-full" disabled={isSubmitting}>
-          {isLoading ? "Signing in…" : "Login"}
+          {isLoading ? "Signing in…" : "Sign in"}
         </Button>
 
         {/* Divider */}
@@ -123,16 +159,37 @@ export function LoginForm({
           </span>
         </div>
 
-        <Button
-          variant="outline"
-          className="w-full"
-          type="button"
-          disabled={isSubmitting}
-          onClick={handleGitHubLogin}
-        >
-          <GitHubLogo className="mr-2 h-4 w-4" />
-          {githubLoading ? "Connecting..." : "Login with GitHub"}
-        </Button>
+        {/* GitHub OAuth with dropdown for options */}
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            className="flex-1"
+            type="button"
+            disabled={isSubmitting}
+            onClick={() => handleGitHubLogin(false)}
+          >
+            <GitHubLogo className="mr-2 h-4 w-4" />
+            {githubLoading ? "Connecting..." : "Continue with GitHub"}
+          </Button>
+          
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant="outline" 
+                size="icon"
+                type="button"
+                disabled={isSubmitting}
+              >
+                <ChevronDown className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => handleGitHubLogin(true)}>
+                Use different GitHub account
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </form>
 
       {/* Footer */}

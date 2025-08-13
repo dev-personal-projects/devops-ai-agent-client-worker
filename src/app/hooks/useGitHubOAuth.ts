@@ -1,95 +1,128 @@
-// Updated useGitHubOAuth hook
 import { apiClient } from "@/lib/api/auth-apiclient";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useCallback } from "react";
+
+interface GitHubOAuthOptions {
+  forceAccountSelection?: boolean;
+  redirectTo?: string;
+}
 
 export function useGitHubOAuth() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
-  const initiateGitHubLogin = async () => {
-    setIsLoading(true);
-    setError(null);
+  const initiateGitHubLogin = useCallback(
+    async (options?: GitHubOAuthOptions) => {
+      setIsLoading(true);
+      setError(null);
 
-    try {
-      const response = await apiClient.initiateGitHubOAuth();
-      if (response.error) {
-        setError(response.error.detail);
-        return;
+      try {
+        // Clear any existing GitHub session to force account selection
+        if (options?.forceAccountSelection) {
+          // Open GitHub logout in a popup to clear session
+          const logoutWindow = window.open(
+            "https://github.com/logout",
+            "github-logout",
+            "width=500,height=600"
+          );
+
+          // Wait a bit for logout to complete
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          logoutWindow?.close();
+        }
+
+        const response = await apiClient.initiateGitHubOAuth(
+          options?.forceAccountSelection
+        );
+
+        if (response.error) {
+          setError(response.error.detail);
+          setIsLoading(false);
+          return;
+        }
+
+        if (response.data) {
+          // Store state for CSRF validation
+          sessionStorage.setItem("github_oauth_state", response.data.state);
+          sessionStorage.setItem(
+            "github_oauth_timestamp",
+            Date.now().toString()
+          );
+
+          if (options?.redirectTo) {
+            sessionStorage.setItem("github_oauth_redirect", options.redirectTo);
+          }
+
+          // Redirect to GitHub
+          window.location.href = response.data.auth_url;
+        }
+      } catch (error) {
+        setError(`Failed to initiate GitHub login: ${error}`);
+        setIsLoading(false);
       }
+    },
+    []
+  );
 
-      if (response.data) {
-        // Store state for validation on the callback
-        sessionStorage.setItem("github_oauth_state", response.data.state);
+  const handleCallback = useCallback(
+    async (code: string, state: string) => {
+      setIsLoading(true);
+      setError(null);
 
-        // Add a timestamp to detect stale states
-        sessionStorage.setItem("github_oauth_timestamp", Date.now().toString());
+      try {
+        // Validate state for CSRF protection
+        const storedState = sessionStorage.getItem("github_oauth_state");
+        const storedTimestamp = sessionStorage.getItem(
+          "github_oauth_timestamp"
+        );
+        const redirectTo = sessionStorage.getItem("github_oauth_redirect");
 
-        // Redirect to GitHub
-        window.location.href = response.data.auth_url;
-      }
-    } catch (error) {
-      setError(`Failed to initiate GitHub login: ${error}`);
-      setIsLoading(false);
-    }
-  };
-
-  const handleCallback = async (code: string, state: string) => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      // Validate state to prevent CSRF attacks
-      const storedState = sessionStorage.getItem("github_oauth_state");
-      const storedTimestamp = sessionStorage.getItem("github_oauth_timestamp");
-
-      // Check if state matches
-      if (!storedState || storedState !== state) {
-        setError("Invalid authentication state. Please try again.");
-        return false;
-      }
-
-      // Check if the OAuth flow isn't too old (10 minutes max)
-      if (storedTimestamp) {
-        const age = Date.now() - parseInt(storedTimestamp);
-        const maxAge = 10 * 60 * 1000; // 10 minutes
-        if (age > maxAge) {
-          setError("Authentication session expired. Please try again.");
+        if (!storedState || storedState !== state) {
+          setError("Invalid authentication state. Please try again.");
+          setIsLoading(false);
           return false;
         }
+
+        // Check if state isn't expired (10 minutes)
+        if (storedTimestamp) {
+          const age = Date.now() - parseInt(storedTimestamp);
+          if (age > 10 * 60 * 1000) {
+            setError("Authentication session expired. Please try again.");
+            setIsLoading(false);
+            return false;
+          }
+        }
+
+        // Call backend to complete OAuth
+        const response = await apiClient.handleGitHubCallback({ code, state });
+
+        if (response.error) {
+          setError(response.error.detail);
+          setIsLoading(false);
+          return false;
+        }
+
+        if (response.data) {
+          // Clear OAuth session data
+          sessionStorage.removeItem("github_oauth_state");
+          sessionStorage.removeItem("github_oauth_timestamp");
+          sessionStorage.removeItem("github_oauth_redirect");
+
+          // Redirect to intended destination or dashboard
+          router.push(redirectTo || "/dashboard");
+          return true;
+        }
+      } catch (err) {
+        console.error("GitHub OAuth callback error:", err);
+        setError("GitHub authentication failed. Please try again.");
+        setIsLoading(false);
       }
 
-      // State validation passed, now call the backend
-      // We still send the state for logging purposes, but validation is done here
-      const response = await apiClient.handleGitHubCallback({
-        code,
-        state, // Backend will receive this but won't validate it
-      });
-
-      if (response.error) {
-        setError(response.error.detail);
-        return false;
-      }
-
-      if (response.data) {
-        // Clear stored OAuth data
-        sessionStorage.removeItem("github_oauth_state");
-        sessionStorage.removeItem("github_oauth_timestamp");
-
-        // Success! Redirect to dashboard
-        router.push("/dashboard");
-        return true;
-      }
-    } catch (err) {
-      console.error("GitHub OAuth callback error:", err);
-      setError("GitHub authentication failed. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
-
-    return false;
-  };
+      return false;
+    },
+    [router]
+  );
 
   return {
     initiateGitHubLogin,
