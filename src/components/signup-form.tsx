@@ -152,7 +152,7 @@ export function SignupForm({
       {/* Footer */}
       <div className="text-center text-sm">
         Already have an account?{" "}
-        <Link href="/login" className="underline underline-offset-4">
+        <Link href="/auth/login" className="underline underline-offset-4">
           Log in
         </Link>
       </div>

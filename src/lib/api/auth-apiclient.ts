@@ -1,27 +1,29 @@
 import {
   ApiResponse,
-  ErrorResponse,
   LoginRequest,
   LoginResponse,
-  OAuthCallbackRequest,
   OAuthInitiateResponse,
   ProfileResponse,
   SignupRequest,
   SignupResponse,
 } from "@/types/auth/auth.types";
 
-// lib/api-client.ts
 class ApiClient {
   private baseURL: string;
   private token: string | null = null;
+  private refreshToken: string | null = null;
 
   constructor(
     baseURL: string = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
   ) {
     this.baseURL = baseURL;
-    // Load token from localStorage on initialization
+    this.loadTokens();
+  }
+
+  private loadTokens() {
     if (typeof window !== "undefined") {
       this.token = localStorage.getItem("access_token");
+      this.refreshToken = localStorage.getItem("refresh_token");
     }
   }
 
@@ -36,7 +38,6 @@ class ApiClient {
       ...(options.headers as Record<string, string>),
     };
 
-    // Add authorization header if token exists
     if (this.token) {
       headers.Authorization = `Bearer ${this.token}`;
     }
@@ -47,20 +48,34 @@ class ApiClient {
         headers,
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        return {
-          error: data,
-          status: response.status,
-        };
+      // Handle 401 and try to refresh token
+      if (response.status === 401 && this.refreshToken) {
+        const refreshed = await this.refreshAccessToken();
+        if (refreshed) {
+          // Retry the original request with new token
+          headers.Authorization = `Bearer ${this.token}`;
+          const retryResponse = await fetch(url, {
+            ...options,
+            headers,
+          });
+          const retryData = await retryResponse.json();
+          return {
+            data: retryResponse.ok ? retryData : undefined,
+            error: !retryResponse.ok ? retryData : undefined,
+            status: retryResponse.status,
+          };
+        }
       }
 
+      const data = await response.json();
+
       return {
-        data,
+        data: response.ok ? data : undefined,
+        error: !response.ok ? data : undefined,
         status: response.status,
       };
     } catch (error) {
+      console.error("API request failed:", error);
       return {
         error: { detail: "Network error occurred" },
         status: 0,
@@ -68,7 +83,28 @@ class ApiClient {
     }
   }
 
-  // Auth methods
+  private async refreshAccessToken(): Promise<boolean> {
+    if (!this.refreshToken) return false;
+
+    try {
+      const response = await this.request<LoginResponse>("/auth/refresh", {
+        method: "POST",
+        body: JSON.stringify({ refresh_token: this.refreshToken }),
+      });
+
+      if (response.data) {
+        this.setTokens(response.data.access_token, response.data.refresh_token);
+        return true;
+      }
+    } catch (error) {
+      console.error("Token refresh failed:", error);
+    }
+
+    // Refresh failed, clear tokens
+    this.clearTokens();
+    return false;
+  }
+
   async signup(payload: SignupRequest): Promise<ApiResponse<SignupResponse>> {
     return this.request<SignupResponse>("/auth/signup", {
       method: "POST",
@@ -82,18 +118,21 @@ class ApiClient {
       body: JSON.stringify(payload),
     });
 
-    // Store token if login successful
-    if (response.data && typeof window !== "undefined") {
-      this.token = response.data.access_token;
-      this.setToken(response.data.access_token);
-      localStorage.setItem("user", JSON.stringify(response.data.user));
+    if (response.data) {
+      this.setTokens(response.data.access_token, response.data.refresh_token);
+      this.saveUser(response.data.user);
     }
 
     return response;
   }
 
-  async initiateGitHubOAuth(): Promise<ApiResponse<OAuthInitiateResponse>> {
-    return this.request<OAuthInitiateResponse>("/auth/oauth/github");
+  async initiateGitHubOAuth(
+    forceReauth: boolean = false
+  ): Promise<ApiResponse<OAuthInitiateResponse>> {
+    const endpoint = forceReauth
+      ? "/auth/oauth/github?force_reauth=true"
+      : "/auth/oauth/github";
+    return this.request<OAuthInitiateResponse>(endpoint);
   }
 
   async handleGitHubCallback(payload: {
@@ -108,56 +147,52 @@ class ApiClient {
       }
     );
 
-    // Store token if OAuth login successful
-    if (response.data && typeof window !== "undefined") {
-      this.token = response.data.access_token;
-      this.setToken(response.data.access_token);
-      this.setRefreshToken(response.data.refresh_token);
-      localStorage.setItem("user", JSON.stringify(response.data.user));
+    if (response.data) {
+      this.setTokens(response.data.access_token, response.data.refresh_token);
+      this.saveUser(response.data.user);
     }
 
     return response;
   }
+
   async getProfile(userId: string): Promise<ApiResponse<ProfileResponse>> {
     return this.request<ProfileResponse>(`/auth/profile/${userId}`);
   }
 
-  async getProtectedInfo(): Promise<
-    ApiResponse<{ message: string; role: string }>
-  > {
-    return this.request<{ message: string; role: string }>("/auth/info");
+  async getCurrentProfile(): Promise<ApiResponse<ProfileResponse>> {
+    return this.request<ProfileResponse>("/auth/profile");
   }
 
-  // Token management
-  setToken(token: string) {
-    this.token = token;
-    if (typeof window !== "undefined") {
-      localStorage.setItem("access_token", token);
-      // Also set as cookie for middleware
-      document.cookie = `access_token=${token}; path=/; max-age=${
-        60 * 60 * 24 * 7
-      }; SameSite=strict`;
-    }
-  }
+  setTokens(accessToken: string, refreshToken: string) {
+    this.token = accessToken;
+    this.refreshToken = refreshToken;
 
-  setRefreshToken(refreshToken: string) {
     if (typeof window !== "undefined") {
+      localStorage.setItem("access_token", accessToken);
       localStorage.setItem("refresh_token", refreshToken);
-      // Also set as cookie for middleware
+
+      // Set secure cookies
+      const secure = window.location.protocol === "https:";
+      document.cookie = `access_token=${accessToken}; path=/; max-age=${
+        60 * 60 * 24 * 7
+      }; SameSite=strict${secure ? "; Secure" : ""}`;
       document.cookie = `refresh_token=${refreshToken}; path=/; max-age=${
         60 * 60 * 24 * 30
-      }; SameSite=strict`;
+      }; SameSite=strict${secure ? "; Secure" : ""}`;
     }
   }
 
-  getToken(): string | null {
-    return this.token;
+  private saveUser(user: any) {
+    if (typeof window !== "undefined" && user) {
+      localStorage.setItem("user", JSON.stringify(user));
+    }
   }
 
-  logout() {
+  clearTokens() {
     this.token = null;
+    this.refreshToken = null;
+
     if (typeof window !== "undefined") {
-      // Clear localStorage
       localStorage.removeItem("access_token");
       localStorage.removeItem("refresh_token");
       localStorage.removeItem("user");
@@ -167,23 +202,35 @@ class ApiClient {
         "access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;";
       document.cookie =
         "refresh_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;";
+    }
+  }
 
-      // Redirect to login
+  logout() {
+    this.clearTokens();
+    if (typeof window !== "undefined") {
       window.location.href = "/auth/login";
     }
   }
 
-  // Check if user is authenticated
   isAuthenticated(): boolean {
     return !!this.token;
   }
-  // Get stored user data
-  getUser(): { id: string; email: string; fullName: string } | null {
+
+  getUser(): {
+    id: string;
+    email: string;
+    fullName: string;
+    avatar_url?: string;
+  } | null {
     if (typeof window !== "undefined") {
       const user = localStorage.getItem("user");
       return user ? JSON.parse(user) : null;
     }
     return null;
+  }
+
+  getToken(): string | null {
+    return this.token;
   }
 }
 
