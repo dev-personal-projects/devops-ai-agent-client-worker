@@ -38,7 +38,6 @@ class ApiClient {
       ...(options.headers as Record<string, string>),
     };
 
-    // Always include auth header if token exists
     if (this.token) {
       headers.Authorization = `Bearer ${this.token}`;
     }
@@ -49,7 +48,6 @@ class ApiClient {
         headers,
       });
 
-      // Handle 401 and try to refresh token
       if (response.status === 401 && this.refreshToken) {
         const refreshed = await this.refreshAccessToken();
         if (refreshed) {
@@ -126,8 +124,7 @@ class ApiClient {
   }
 
   /**
-   * Initiate GitHub account linking for authenticated users
-   * This creates a special OAuth flow that links to existing account
+   * Link GitHub account to authenticated user
    */
   async linkGitHubAccount(
     forceAccountSelection: boolean = false
@@ -147,8 +144,49 @@ class ApiClient {
   }
 
   /**
-   * Initiate regular GitHub OAuth for new users/login
+   * Update/change existing linked GitHub account
    */
+  async updateGitHubAccount(): Promise<ApiResponse<OAuthInitiateResponse>> {
+    if (!this.token) {
+      return {
+        error: { detail: "Must be logged in to update GitHub account" },
+        status: 401,
+      };
+    }
+
+    return this.request<OAuthInitiateResponse>("/auth/oauth/github/update");
+  }
+
+  /**
+   * Get current GitHub account info
+   */
+  async getGitHubInfo(): Promise<ApiResponse<any>> {
+    if (!this.token) {
+      return {
+        error: { detail: "Must be logged in" },
+        status: 401,
+      };
+    }
+
+    return this.request<any>("/auth/oauth/github/info");
+  }
+
+  /**
+   * Disconnect GitHub account
+   */
+  async disconnectGitHub(): Promise<ApiResponse<{ message: string }>> {
+    if (!this.token) {
+      return {
+        error: { detail: "Must be logged in" },
+        status: 401,
+      };
+    }
+
+    return this.request<{ message: string }>("/auth/oauth/github/disconnect", {
+      method: "DELETE",
+    });
+  }
+
   async initiateGitHubOAuth(
     forceReauth: boolean = false
   ): Promise<ApiResponse<OAuthInitiateResponse>> {
@@ -158,22 +196,21 @@ class ApiClient {
     return this.request<OAuthInitiateResponse>(endpoint);
   }
 
-  /**
-   * Handle GitHub OAuth callback
-   * Automatically detects if this is a linking flow based on stored state
-   */
   async handleGitHubCallback(payload: {
     code: string;
     state?: string;
   }): Promise<ApiResponse<LoginResponse>> {
-    // Check if this is a linking flow by comparing states
     const isLinking =
       sessionStorage.getItem("github_link_state") === payload.state;
+    const isUpdating = 
+      sessionStorage.getItem("github_update_state") === payload.state;
 
     console.log("OAuth callback:", {
       isLinking,
+      isUpdating,
       hasToken: !!this.token,
       storedLinkState: sessionStorage.getItem("github_link_state"),
+      storedUpdateState: sessionStorage.getItem("github_update_state"),
       receivedState: payload.state,
     });
 
@@ -182,8 +219,7 @@ class ApiClient {
       body: JSON.stringify(payload),
     };
 
-    // For linking flows, ensure we include the auth header
-    if (isLinking && this.token) {
+    if ((isLinking || isUpdating) && this.token) {
       requestOptions.headers = {
         ...requestOptions.headers,
         Authorization: `Bearer ${this.token}`,
@@ -203,6 +239,9 @@ class ApiClient {
       if (isLinking) {
         sessionStorage.removeItem("github_link_state");
         sessionStorage.removeItem("github_link_timestamp");
+      } else if (isUpdating) {
+        sessionStorage.removeItem("github_update_state");
+        sessionStorage.removeItem("github_update_timestamp");
       } else {
         sessionStorage.removeItem("github_oauth_state");
         sessionStorage.removeItem("github_oauth_timestamp");

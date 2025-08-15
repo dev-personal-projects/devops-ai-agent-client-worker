@@ -12,21 +12,38 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from "../hooks/auth";
 import { useEffect, useState } from "react";
 import { apiClient } from "@/lib/api/auth-apiclient";
-import { Github, Link, CheckCircle, AlertCircle, Loader2, ChevronDown } from "lucide-react";
+import {
+  Github,
+  CheckCircle,
+  AlertCircle,
+  Loader2,
+  ChevronDown,
+  Settings,
+  Unlink,
+} from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useGitHubLink } from "../hooks/useGitHubLink";
 
 export default function DashboardPage() {
   const { user, logout } = useAuth();
-  const { linkGitHub, isLinking, linkError, clearError } = useGitHubLink();
+  const {
+    linkGitHub,
+    updateGitHub,
+    disconnectGitHub,
+    isLinking,
+    linkError,
+    clearError,
+  } = useGitHubLink();
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [githubInfo, setGithubInfo] = useState<any>(null);
 
   useEffect(() => {
     async function fetchProfile() {
@@ -35,6 +52,17 @@ export default function DashboardPage() {
           const response = await apiClient.getCurrentProfile();
           if (response.data) {
             setProfile(response.data);
+
+            // Fetch GitHub info if linked
+            if (
+              response.data.oauth_github_id ||
+              response.data.oauth_provider === "github"
+            ) {
+              const githubResponse = await apiClient.getGitHubInfo();
+              if (githubResponse.data) {
+                setGithubInfo(githubResponse.data);
+              }
+            }
           }
         } finally {
           setLoading(false);
@@ -44,12 +72,20 @@ export default function DashboardPage() {
     fetchProfile();
   }, [user]);
 
-  // Check if user has GitHub linked - improved logic
   const hasGitHubLinked =
     profile?.oauth_github_id ||
     profile?.oauth_provider === "github" ||
-    // If user signed up via GitHub OAuth, they already have it linked
     (profile?.oauth_provider && !profile?.oauth_github_id);
+
+  const handleDisconnect = async () => {
+    if (confirm("Are you sure you want to disconnect your GitHub account?")) {
+      const success = await disconnectGitHub();
+      if (success) {
+        // Refresh profile
+        window.location.reload();
+      }
+    }
+  };
 
   if (loading) {
     return (
@@ -84,7 +120,8 @@ export default function DashboardPage() {
             {linkError && (
               <Alert variant="destructive" className="mb-4">
                 <AlertDescription>
-                  {linkError === "This GitHub account is already linked to another user"
+                  {linkError ===
+                  "This GitHub account is already linked to another user"
                     ? "This GitHub account is already connected to a different user. Please try with a different GitHub account."
                     : linkError}
                 </AlertDescription>
@@ -112,22 +149,18 @@ export default function DashboardPage() {
                   </>
                 )}
               </Button>
-              
+
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button 
-                    variant="outline" 
-                    size="lg"
-                    disabled={isLinking}
-                  >
+                  <Button variant="outline" size="lg" disabled={isLinking}>
                     <ChevronDown className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem 
+                  <DropdownMenuItem
                     onClick={() => {
                       clearError();
-                      linkGitHub(true); // Force account selection
+                      linkGitHub(true);
                     }}
                   >
                     Use different GitHub account
@@ -139,26 +172,71 @@ export default function DashboardPage() {
         </Card>
       )}
 
-      {/* Success State - GitHub Connected */}
+      {/* GitHub Connected Card with Management Options */}
       {hasGitHubLinked && (
         <Card className="mb-6 border-green-500">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-green-600">
-              <CheckCircle className="h-5 w-5" />
-              GitHub Connected
-            </CardTitle>
-            <CardDescription>
-              {profile?.oauth_provider === "github"
-                ? "You signed up with GitHub - full access enabled"
-                : "GitHub account linked - full access enabled"}
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2 text-green-600">
+                  <CheckCircle className="h-5 w-5" />
+                  GitHub Connected
+                </CardTitle>
+                <CardDescription>
+                  {profile?.oauth_provider === "github"
+                    ? "You signed up with GitHub - full access enabled"
+                    : "GitHub account linked - full access enabled"}
+                </CardDescription>
+              </div>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Settings className="h-4 w-4 mr-2" />
+                    Manage
+                    <ChevronDown className="h-4 w-4 ml-2" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onClick={() => {
+                      clearError();
+                      updateGitHub();
+                    }}
+                    disabled={isLinking}
+                  >
+                    <Github className="h-4 w-4 mr-2" />
+                    Change GitHub Account
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={handleDisconnect}
+                    className="text-red-600"
+                    disabled={profile?.oauth_provider === "github"}
+                  >
+                    <Unlink className="h-4 w-4 mr-2" />
+                    Disconnect GitHub
+                  </DropdownMenuItem>
+                  {profile?.oauth_provider === "github" && (
+                    <div className="px-2 py-1 text-xs text-muted-foreground">
+                      Cannot disconnect primary auth method
+                    </div>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </CardHeader>
           <CardContent>
+            {linkError && (
+              <Alert variant="destructive" className="mb-4">
+                <AlertDescription>{linkError}</AlertDescription>
+              </Alert>
+            )}
             <div className="flex items-center gap-4">
               <Avatar className="h-12 w-12">
-                <AvatarImage 
-                  src={profile?.avatar_url} 
-                  alt={profile?.full_name || 'User avatar'}
+                <AvatarImage
+                  src={profile?.avatar_url}
+                  alt={profile?.full_name || "User avatar"}
                 />
                 <AvatarFallback>
                   <Github className="h-6 w-6" />
@@ -172,13 +250,18 @@ export default function DashboardPage() {
                 {profile?.oauth_provider === "github" && (
                   <p className="text-xs text-green-600">OAuth User</p>
                 )}
+                {githubInfo?.github_id && (
+                  <p className="text-xs text-muted-foreground">
+                    GitHub ID: {githubInfo.github_id}
+                  </p>
+                )}
               </div>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* DevOps Features - Show for all GitHub-connected users */}
+      {/* DevOps Features */}
       {hasGitHubLinked ? (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           <Card>
