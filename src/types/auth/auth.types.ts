@@ -14,6 +14,15 @@ export interface ProfileResponse {
   email: string;
   full_name: string;
   role: string;
+  status?: string;
+  avatar_url?: string;
+  bio?: string;
+  phone?: string;
+  location?: string;
+  // OAuth provider fields - help detect linked accounts
+  oauth_provider?: string; // 'github', 'google', etc.
+  oauth_github_id?: string; // GitHub user ID if linked
+  oauth_google_id?: string; // Google user ID if linked
 }
 
 export interface SignupResponse {
@@ -32,11 +41,14 @@ export interface LoginResponse {
     id: string;
     email: string;
     fullName: string;
+    avatar_url?: string;
   };
 }
 
 export interface ErrorResponse {
   detail: string;
+  code?: string;
+  field?: string;
 }
 
 // API Response wrapper for consistent error handling
@@ -49,9 +61,10 @@ export interface ApiResponse<T> {
 export interface OAuthInitiateResponse {
   auth_url: string;
   state: string;
+  provider?: string;
 }
 
 export interface OAuthCallbackRequest {
   code: string;
-  state: string;
+  state?: string;
 }

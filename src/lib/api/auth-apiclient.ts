@@ -38,6 +38,7 @@ class ApiClient {
       ...(options.headers as Record<string, string>),
     };
 
+    // Always include auth header if token exists
     if (this.token) {
       headers.Authorization = `Bearer ${this.token}`;
     }
@@ -52,7 +53,6 @@ class ApiClient {
       if (response.status === 401 && this.refreshToken) {
         const refreshed = await this.refreshAccessToken();
         if (refreshed) {
-          // Retry the original request with new token
           headers.Authorization = `Bearer ${this.token}`;
           const retryResponse = await fetch(url, {
             ...options,
@@ -100,7 +100,6 @@ class ApiClient {
       console.error("Token refresh failed:", error);
     }
 
-    // Refresh failed, clear tokens
     this.clearTokens();
     return false;
   }
@@ -126,6 +125,30 @@ class ApiClient {
     return response;
   }
 
+  /**
+   * Initiate GitHub account linking for authenticated users
+   * This creates a special OAuth flow that links to existing account
+   */
+  async linkGitHubAccount(
+    forceAccountSelection: boolean = false
+  ): Promise<ApiResponse<OAuthInitiateResponse>> {
+    if (!this.token) {
+      return {
+        error: { detail: "Must be logged in to link GitHub account" },
+        status: 401,
+      };
+    }
+
+    const endpoint = forceAccountSelection
+      ? "/auth/oauth/github/link?force_reauth=true"
+      : "/auth/oauth/github/link";
+    
+    return this.request<OAuthInitiateResponse>(endpoint);
+  }
+
+  /**
+   * Initiate regular GitHub OAuth for new users/login
+   */
   async initiateGitHubOAuth(
     forceReauth: boolean = false
   ): Promise<ApiResponse<OAuthInitiateResponse>> {
@@ -135,21 +158,55 @@ class ApiClient {
     return this.request<OAuthInitiateResponse>(endpoint);
   }
 
+  /**
+   * Handle GitHub OAuth callback
+   * Automatically detects if this is a linking flow based on stored state
+   */
   async handleGitHubCallback(payload: {
     code: string;
     state?: string;
   }): Promise<ApiResponse<LoginResponse>> {
+    // Check if this is a linking flow by comparing states
+    const isLinking =
+      sessionStorage.getItem("github_link_state") === payload.state;
+
+    console.log("OAuth callback:", {
+      isLinking,
+      hasToken: !!this.token,
+      storedLinkState: sessionStorage.getItem("github_link_state"),
+      receivedState: payload.state,
+    });
+
+    const requestOptions: RequestInit = {
+      method: "POST",
+      body: JSON.stringify(payload),
+    };
+
+    // For linking flows, ensure we include the auth header
+    if (isLinking && this.token) {
+      requestOptions.headers = {
+        ...requestOptions.headers,
+        Authorization: `Bearer ${this.token}`,
+      };
+    }
+
     const response = await this.request<LoginResponse>(
       "/auth/oauth/github/callback",
-      {
-        method: "POST",
-        body: JSON.stringify(payload),
-      }
+      requestOptions
     );
 
     if (response.data) {
       this.setTokens(response.data.access_token, response.data.refresh_token);
       this.saveUser(response.data.user);
+
+      // Clear session storage
+      if (isLinking) {
+        sessionStorage.removeItem("github_link_state");
+        sessionStorage.removeItem("github_link_timestamp");
+      } else {
+        sessionStorage.removeItem("github_oauth_state");
+        sessionStorage.removeItem("github_oauth_timestamp");
+      }
     }
 
     return response;
@@ -171,7 +228,6 @@ class ApiClient {
       localStorage.setItem("access_token", accessToken);
       localStorage.setItem("refresh_token", refreshToken);
 
-      // Set secure cookies
       const secure = window.location.protocol === "https:";
       document.cookie = `access_token=${accessToken}; path=/; max-age=${
         60 * 60 * 24 * 7
@@ -197,7 +253,6 @@ class ApiClient {
       localStorage.removeItem("refresh_token");
       localStorage.removeItem("user");
 
-      // Clear cookies
       document.cookie =
         "access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;";
       document.cookie =

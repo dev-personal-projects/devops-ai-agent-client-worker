@@ -71,12 +71,17 @@ export function useGitHubOAuth() {
       setError(null);
 
       try {
-        // Validate state for CSRF protection
-        const storedState = sessionStorage.getItem("github_oauth_state");
-        const storedTimestamp = sessionStorage.getItem(
-          "github_oauth_timestamp"
-        );
+        // Check both OAuth and linking states
+        const oauthState = sessionStorage.getItem("github_oauth_state");
+        const linkState = sessionStorage.getItem("github_link_state");
+        const oauthTimestamp = sessionStorage.getItem("github_oauth_timestamp");
+        const linkTimestamp = sessionStorage.getItem("github_link_timestamp");
         const redirectTo = sessionStorage.getItem("github_oauth_redirect");
+
+        // Determine which flow this is and validate accordingly
+        const isLinking = linkState === state;
+        const storedState = isLinking ? linkState : oauthState;
+        const storedTimestamp = isLinking ? linkTimestamp : oauthTimestamp;
 
         if (!storedState || storedState !== state) {
           setError("Invalid authentication state. Please try again.");
@@ -104,13 +109,18 @@ export function useGitHubOAuth() {
         }
 
         if (response.data) {
-          // Clear OAuth session data
-          sessionStorage.removeItem("github_oauth_state");
-          sessionStorage.removeItem("github_oauth_timestamp");
-          sessionStorage.removeItem("github_oauth_redirect");
-
-          // Redirect to intended destination or dashboard
-          router.push(redirectTo || "/dashboard");
+          // Clear session data based on flow type
+          if (isLinking) {
+            sessionStorage.removeItem("github_link_state");
+            sessionStorage.removeItem("github_link_timestamp");
+            // Don't redirect here for linking - let callback page handle it
+          } else {
+            sessionStorage.removeItem("github_oauth_state");
+            sessionStorage.removeItem("github_oauth_timestamp");
+            sessionStorage.removeItem("github_oauth_redirect");
+            // Redirect to intended destination or dashboard
+            router.push(redirectTo || "/dashboard");
+          }
           return true;
         }
       } catch (err) {
