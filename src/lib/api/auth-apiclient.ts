@@ -48,11 +48,9 @@ class ApiClient {
         headers,
       });
 
-      // Handle 401 and try to refresh token
       if (response.status === 401 && this.refreshToken) {
         const refreshed = await this.refreshAccessToken();
         if (refreshed) {
-          // Retry the original request with new token
           headers.Authorization = `Bearer ${this.token}`;
           const retryResponse = await fetch(url, {
             ...options,
@@ -100,7 +98,6 @@ class ApiClient {
       console.error("Token refresh failed:", error);
     }
 
-    // Refresh failed, clear tokens
     this.clearTokens();
     return false;
   }
@@ -126,6 +123,70 @@ class ApiClient {
     return response;
   }
 
+  /**
+   * Link GitHub account to authenticated user
+   */
+  async linkGitHubAccount(
+    forceAccountSelection: boolean = false
+  ): Promise<ApiResponse<OAuthInitiateResponse>> {
+    if (!this.token) {
+      return {
+        error: { detail: "Must be logged in to link GitHub account" },
+        status: 401,
+      };
+    }
+
+    const endpoint = forceAccountSelection
+      ? "/auth/oauth/github/link?force_reauth=true"
+      : "/auth/oauth/github/link";
+    
+    return this.request<OAuthInitiateResponse>(endpoint);
+  }
+
+  /**
+   * Update/change existing linked GitHub account
+   */
+  async updateGitHubAccount(): Promise<ApiResponse<OAuthInitiateResponse>> {
+    if (!this.token) {
+      return {
+        error: { detail: "Must be logged in to update GitHub account" },
+        status: 401,
+      };
+    }
+
+    return this.request<OAuthInitiateResponse>("/auth/oauth/github/update");
+  }
+
+  /**
+   * Get current GitHub account info
+   */
+  async getGitHubInfo(): Promise<ApiResponse<any>> {
+    if (!this.token) {
+      return {
+        error: { detail: "Must be logged in" },
+        status: 401,
+      };
+    }
+
+    return this.request<any>("/auth/oauth/github/info");
+  }
+
+  /**
+   * Disconnect GitHub account
+   */
+  async disconnectGitHub(): Promise<ApiResponse<{ message: string }>> {
+    if (!this.token) {
+      return {
+        error: { detail: "Must be logged in" },
+        status: 401,
+      };
+    }
+
+    return this.request<{ message: string }>("/auth/oauth/github/disconnect", {
+      method: "DELETE",
+    });
+  }
+
   async initiateGitHubOAuth(
     forceReauth: boolean = false
   ): Promise<ApiResponse<OAuthInitiateResponse>> {
@@ -139,17 +200,52 @@ class ApiClient {
     code: string;
     state?: string;
   }): Promise<ApiResponse<LoginResponse>> {
+    const isLinking =
+      sessionStorage.getItem("github_link_state") === payload.state;
+    const isUpdating = 
+      sessionStorage.getItem("github_update_state") === payload.state;
+
+    console.log("OAuth callback:", {
+      isLinking,
+      isUpdating,
+      hasToken: !!this.token,
+      storedLinkState: sessionStorage.getItem("github_link_state"),
+      storedUpdateState: sessionStorage.getItem("github_update_state"),
+      receivedState: payload.state,
+    });
+
+    const requestOptions: RequestInit = {
+      method: "POST",
+      body: JSON.stringify(payload),
+    };
+
+    if ((isLinking || isUpdating) && this.token) {
+      requestOptions.headers = {
+        ...requestOptions.headers,
+        Authorization: `Bearer ${this.token}`,
+      };
+    }
+
     const response = await this.request<LoginResponse>(
       "/auth/oauth/github/callback",
-      {
-        method: "POST",
-        body: JSON.stringify(payload),
-      }
+      requestOptions
     );
 
     if (response.data) {
       this.setTokens(response.data.access_token, response.data.refresh_token);
       this.saveUser(response.data.user);
+
+      // Clear session storage
+      if (isLinking) {
+        sessionStorage.removeItem("github_link_state");
+        sessionStorage.removeItem("github_link_timestamp");
+      } else if (isUpdating) {
+        sessionStorage.removeItem("github_update_state");
+        sessionStorage.removeItem("github_update_timestamp");
+      } else {
+        sessionStorage.removeItem("github_oauth_state");
+        sessionStorage.removeItem("github_oauth_timestamp");
+      }
     }
 
     return response;
@@ -171,7 +267,6 @@ class ApiClient {
       localStorage.setItem("access_token", accessToken);
       localStorage.setItem("refresh_token", refreshToken);
 
-      // Set secure cookies
       const secure = window.location.protocol === "https:";
       document.cookie = `access_token=${accessToken}; path=/; max-age=${
         60 * 60 * 24 * 7
@@ -197,7 +292,6 @@ class ApiClient {
       localStorage.removeItem("refresh_token");
       localStorage.removeItem("user");
 
-      // Clear cookies
       document.cookie =
         "access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;";
       document.cookie =

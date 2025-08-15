@@ -62,7 +62,7 @@ export function SignupForm({
     const success = await signup(signupData);
 
     if (success) {
-      router.push("/login");
+      router.push("/auth/login");
     }
   };
 
