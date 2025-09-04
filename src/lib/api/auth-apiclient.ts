@@ -163,7 +163,7 @@ class ApiClient {
   async getGitHubInfo(): Promise<ApiResponse<any>> {
     if (!this.token) {
       return {
-        error: { detail: "Must be logged in" },
+        error: { detail: "Must be logged in to access the application" },
         status: 401,
       };
     }
