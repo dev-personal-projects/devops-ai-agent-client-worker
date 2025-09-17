@@ -1,116 +1,112 @@
-"use client"
+"use client";
 
-import * as React from "react"
+import * as React from "react";
 import {
-  AudioWaveform,
-  BookOpen,
   Bot,
-  Command,
-  Frame,
   GalleryVerticalEnd,
-  Map,
-  PieChart,
   Settings2,
-  SquareTerminal,
-} from "lucide-react"
+  MessageCircleCode,
+  LucideGithub,
+  Settings,
+} from "lucide-react";
 
-import { NavMain } from "@/components/nav-main"
-import { NavProjects } from "@/components/nav-projects"
-import { NavUser } from "@/components/nav-user"
-import { TeamSwitcher } from "@/components/team-switcher"
+import { NavMain } from "@/components/nav-main";
+import { NavUser } from "@/components/nav-user";
+import { TeamSwitcher } from "@/components/team-switcher";
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarHeader,
   SidebarRail,
-} from "@/components/ui/sidebar"
+} from "@/components/ui/sidebar";
+import { FaMicrosoft } from "react-icons/fa";
 
-// This is sample data.
 const data = {
-  user: {
-    name: "shadcn",
-    email: "m@example.com",
-    avatar: "/avatars/shadcn.jpg",
-  },
   teams: [
     {
-      name: "Acme Inc",
+      name: "Devops AI Agent",
       logo: GalleryVerticalEnd,
       plan: "Enterprise",
-    },
-    {
-      name: "Acme Corp.",
-      logo: AudioWaveform,
-      plan: "Startup",
-    },
-    {
-      name: "Evil Corp.",
-      logo: Command,
-      plan: "Free",
     },
   ],
   navMain: [
     {
-      title: "Playground",
+      title: "Chat",
       url: "#",
-      icon: SquareTerminal,
+      icon: MessageCircleCode,
       isActive: true,
       items: [
         {
-          title: "History",
+          title: "New Chat",
           url: "#",
         },
         {
-          title: "Starred",
-          url: "#",
-        },
-        {
-          title: "Settings",
+          title: " Chat History",
           url: "#",
         },
       ],
     },
     {
-      title: "Models",
+      title: "Analysis",
       url: "#",
       icon: Bot,
       items: [
         {
-          title: "Genesis",
+          title: "Codebase Analysis",
           url: "#",
         },
         {
-          title: "Explorer",
+          title: "Infrastructure Analysis",
           url: "#",
         },
         {
-          title: "Quantum",
+          title: "Recommendations & Insights",
           url: "#",
         },
       ],
     },
     {
-      title: "Documentation",
+      title: "Deployments",
       url: "#",
-      icon: BookOpen,
+      icon: Settings,
       items: [
         {
-          title: "Introduction",
+          title: "New Deployment",
           url: "#",
         },
         {
-          title: "Get Started",
+          title: " Manage Deployments",
           url: "#",
         },
         {
-          title: "Tutorials",
+          title: "Deployment Logs",
           url: "#",
         },
         {
-          title: "Changelog",
+          title: "Deployment Settings",
           url: "#",
         },
+      ],
+    },
+        {
+      title: "Github Central",
+      url: "#",
+      icon: LucideGithub,
+      items: [
+        {
+          title: "Repositories",
+          url: "#",
+        },
+        {
+          title: "Organizations",
+          url: "#",
+
+        },
+        {
+          title: "Pull Requests",
+          url: "#",
+        }
       ],
     },
     {
@@ -130,31 +126,11 @@ const data = {
           title: "Billing",
           url: "#",
         },
-        {
-          title: "Limits",
-          url: "#",
-        },
       ],
     },
+
   ],
-  projects: [
-    {
-      name: "Design Engineering",
-      url: "#",
-      icon: Frame,
-    },
-    {
-      name: "Sales & Marketing",
-      url: "#",
-      icon: PieChart,
-    },
-    {
-      name: "Travel",
-      url: "#",
-      icon: Map,
-    },
-  ],
-}
+};
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
@@ -164,12 +140,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={data.navMain} />
-        <NavProjects projects={data.projects} />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <NavUser />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>
-  )
+  );
 }

@@ -8,6 +8,7 @@ export function useAuth() {
     id: string;
     email: string;
     fullName: string;
+    avatar_url?: string;
   } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

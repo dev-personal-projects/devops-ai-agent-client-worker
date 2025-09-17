@@ -1,19 +1,17 @@
-"use client"
+"use client";
 
 import {
   BadgeCheck,
   Bell,
   ChevronsUpDown,
   CreditCard,
+  Github,
+  Loader2,
   LogOut,
   Sparkles,
-} from "lucide-react"
+} from "lucide-react";
 
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,24 +20,84 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from "@/components/ui/dropdown-menu";
 import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
-} from "@/components/ui/sidebar"
+} from "@/components/ui/sidebar";
+import { useAuth } from "@/app/hooks/auth";
+import { useEffect, useState } from "react";
+import { apiClient } from "@/lib/api/auth-apiclient";
+import { useGitHubLink } from "@/app/hooks/useGitHubLink";
 
-export function NavUser({
-  user,
-}: {
-  user: {
-    name: string
-    email: string
-    avatar: string
+type User = {
+  name: string;
+  email: string;
+  avatar: string;
+};
+
+export function NavUser() {
+  const { user, logout } = useAuth();
+  const [profile, setProfile] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [githubInfo, setGithubInfo] = useState<any>(null);
+  const {
+    disconnectGitHub,
+    isLinking,
+    linkError,
+  } = useGitHubLink();
+
+  useEffect(() => {
+    async function fetchProfile() {
+      setLoading(true);
+      try {
+        const response = await apiClient.getCurrentProfile();
+        if (response.data) {
+          setProfile(response.data);
+          // Fetch GitHub info if linked
+          if (
+            response.data.oauth_github_id ||
+            response.data.oauth_provider === "github"
+          ) {
+            const githubResponse = await apiClient.getGitHubInfo();
+            if (githubResponse.data) {
+              setGithubInfo(githubResponse.data);
+            }
+          }
+        }
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchProfile();
+  }, [user]);
+
+  const hasGitHubLinked =
+    profile?.oauth_github_id ||
+    profile?.oauth_provider === "github" ||
+    (profile?.oauth_provider && !profile?.oauth_github_id);
+
+  const handleDisconnect = async () => {
+    if (confirm("Are you sure you want to disconnect your GitHub account?")) {
+      const success = await disconnectGitHub();
+      if (success) {
+        // Refresh profile
+        window.location.reload();
+      }
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
   }
-}) {
-  const { isMobile } = useSidebar()
+
+  const { isMobile } = useSidebar();
 
   return (
     <SidebarMenu>
@@ -51,12 +109,27 @@ export function NavUser({
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
               <Avatar className="h-8 w-8 rounded-lg">
-                <AvatarImage src={user.avatar} alt={user.name} />
-                <AvatarFallback className="rounded-lg">CN</AvatarFallback>
+                <AvatarImage
+                  src={profile?.avatar_url || user?.avatar_url || ""}
+                  alt={user?.fullName ?? ""}
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = "none";
+                  }}
+                />
+                <AvatarFallback className="rounded-lg">
+                  {user?.fullName
+                    ? user.fullName
+                        .split(" ")
+                        .map((n: string) => n[0])
+                        .join("")
+                    : "CN"}
+                </AvatarFallback>
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-medium">{user.name}</span>
-                <span className="truncate text-xs">{user.email}</span>
+                <span className="truncate font-medium">
+                  {user?.fullName ?? ""}
+                </span>
+                <span className="truncate text-xs">{user?.email ?? ""}</span>
               </div>
               <ChevronsUpDown className="ml-auto size-4" />
             </SidebarMenuButton>
@@ -70,12 +143,27 @@ export function NavUser({
             <DropdownMenuLabel className="p-0 font-normal">
               <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                 <Avatar className="h-8 w-8 rounded-lg">
-                  <AvatarImage src={user.avatar} alt={user.name} />
-                  <AvatarFallback className="rounded-lg">CN</AvatarFallback>
+                  <AvatarImage
+                    src={profile?.avatar_url || user?.avatar_url || ""}
+                    alt={user?.fullName ?? ""}
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = "none";
+                    }}
+                  />
+                  <AvatarFallback className="rounded-lg">
+                    {user?.fullName ? (
+                      user.fullName
+                        .split(" ")
+                        .map((n: string) => n[0])
+                        .join("")
+                    ) : (
+                      <Github className="h-4 w-4" />
+                    )}
+                  </AvatarFallback>
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-medium">{user.name}</span>
-                  <span className="truncate text-xs">{user.email}</span>
+                  <span className="truncate font-medium">{user?.fullName}</span>
+                  <span className="truncate text-xs">{user?.email ?? ""}</span>
                 </div>
               </div>
             </DropdownMenuLabel>
@@ -110,5 +198,5 @@ export function NavUser({
         </DropdownMenu>
       </SidebarMenuItem>
     </SidebarMenu>
-  )
+  );
 }
