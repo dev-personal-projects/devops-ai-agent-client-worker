@@ -14,7 +14,7 @@ class ApiClient {
   private refreshToken: string | null = null;
 
   constructor(
-    baseURL: string = process.env.NEXT_PUBLIC_API_URL || ''
+    baseURL: string = process.env.NEXT_PUBLIC_API_URL ||  ''
   ) {
     this.baseURL = baseURL;
     this.loadTokens();
