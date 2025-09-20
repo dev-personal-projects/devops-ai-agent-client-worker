@@ -10,17 +10,24 @@ export function useAuth() {
     fullName: string;
     avatar_url?: string;
   } | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true); // Start with true
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     // Check if user is logged in on mount
-    const storedUser = apiClient.getUser();
-    const token = apiClient.getToken();
+    const initializeAuth = () => {
+      const storedUser = apiClient.getUser();
+      const token = apiClient.getToken();
 
-    if (token && storedUser) {
-      setUser(storedUser);
-    }
+      console.log("Auth initialization:", { hasToken: !!token, hasUser: !!storedUser });
+
+      if (token && storedUser) {
+        setUser(storedUser);
+      }
+      setIsLoading(false);
+    };
+
+    initializeAuth();
   }, []);
 
   const login = async (credentials: LoginRequest) => {
@@ -32,16 +39,22 @@ export function useAuth() {
 
       if (response.error) {
         setError(response.error.detail);
+        setIsLoading(false);
         return false;
       }
 
       if (response.data) {
+        // Set user state immediately
         setUser(response.data.user);
+        
+        // Small delay to ensure state is updated
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        setIsLoading(false);
         return true;
       }
     } catch (err) {
       setError("Login failed. Please try again.");
-    } finally {
       setIsLoading(false);
     }
 
@@ -78,12 +91,11 @@ export function useAuth() {
   };
 
   const logout = () => {
-    apiClient.logout();
     setUser(null);
-    // logout() in apiClient already handles redirect
+    apiClient.logout();
   };
 
-  const isAuthenticated = !!apiClient.getToken();
+  const isAuthenticated = !!user && !!apiClient.getToken();
 
   return {
     user,

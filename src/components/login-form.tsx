@@ -12,7 +12,7 @@ import { useAuth } from "@/app/hooks/auth";
 import { LoginRequest } from "@/types/auth/auth.types";
 import { useGitHubOAuth } from "@/app/hooks/useGitHubOAuth";
 import { apiClient } from "@/lib/api/auth-apiclient";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,7 +37,7 @@ export function LoginForm({
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirectTo") || "/dashboard";
 
-  const { login, isLoading, error, clearError } = useAuth();
+  const { login, isLoading, error, clearError, user, isAuthenticated } = useAuth();
   const {
     initiateGitHubLogin,
     isLoading: githubLoading,
@@ -45,7 +45,19 @@ export function LoginForm({
     clearError: clearGitHubError,
   } = useGitHubOAuth();
 
-  const [showGitHubOptions, setShowGitHubOptions] = useState(false);
+  const [loginAttempted, setLoginAttempted] = useState(false);
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated && user && !isLoading) {
+      console.log("User is authenticated, redirecting...", { user: user.id });
+      if (redirectTo && redirectTo !== "/dashboard") {
+        router.push(redirectTo);
+      } else {
+        router.push(`/${user.id}/dashboard`);
+      }
+    }
+  }, [isAuthenticated, user, isLoading, router, redirectTo]);
 
   const handleGitHubLogin = async (forceAccountSelection: boolean = false) => {
     clearError();
@@ -70,6 +82,7 @@ export function LoginForm({
 
   const onSubmit = async (data: FormValues) => {
     clearError();
+    setLoginAttempted(true);
     console.log("🔐 Starting login process...");
 
     const loginData: LoginRequest = {
@@ -81,18 +94,24 @@ export function LoginForm({
     console.log("🔐 Login result:", success);
 
     if (success) {
-      const userData = apiClient.getUser();
-      const userId = userData?.id;
-
-      if (redirectTo && redirectTo !== "/dashboard") {
-        router.push(redirectTo);
-      } else if (userId) {
-        router.push(`/${userId}/dashboard`);
-      } else {
-        router.push("/dashboard");
-      }
+      console.log("Login successful, auth state should handle redirect");
+      // Don't manually redirect here - let the useEffect handle it
+    } else {
+      setLoginAttempted(false);
     }
   };
+
+  // Show loading if we're in the middle of a login attempt
+  if (loginAttempted && isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+          <p className="mt-2 text-sm text-gray-600">Signing you in...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>

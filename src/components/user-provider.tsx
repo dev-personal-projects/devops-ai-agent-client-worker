@@ -1,7 +1,6 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { useAuth } from "@/app/hooks/auth";
 import { apiClient } from "@/lib/api/auth-apiclient";
 import { Loader2 } from "lucide-react";
@@ -55,8 +54,7 @@ export function UserProvider({ children, userId }: UserProviderProps) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { user: currentUser, logout } = useAuth();
-  const router = useRouter();
+  const { user: currentUser } = useAuth();
 
   const refreshProfile = async () => {
     try {
@@ -78,37 +76,14 @@ export function UserProvider({ children, userId }: UserProviderProps) {
   };
 
   useEffect(() => {
-    // Check if the current user matches the URL userId
-    if (currentUser && currentUser.id !== userId) {
-      // User is trying to access another user's space
-      console.warn(
-        `User ${currentUser.id} attempting to access ${userId}'s space`
-      );
-      router.replace(`/${currentUser.id}/dashboard`);
-      return;
+    // Only load profile if we have a current user
+    // AuthGuard will handle authentication checks
+    if (currentUser) {
+      refreshProfile();
+    } else {
+      setIsLoading(false);
     }
-
-    // If no current user, redirect to login
-    if (!currentUser) {
-      router.replace("/auth/login");
-      return;
-    }
-
-    // Load user profile
-    refreshProfile();
-  }, [userId, currentUser, router]);
-
-  // Show loading state
-  if (isLoading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="flex flex-col items-center gap-2">
-          <Loader2 className="h-8 w-8 animate-spin" />
-          <p className="text-sm text-muted-foreground">Loading user data...</p>
-        </div>
-      </div>
-    );
-  }
+  }, [currentUser]);
 
   // Show error state
   if (error) {
@@ -140,12 +115,6 @@ export function UserProvider({ children, userId }: UserProviderProps) {
               className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
             >
               Try Again
-            </button>
-            <button
-              onClick={() => logout()}
-              className="px-4 py-2 border border-border rounded-md hover:bg-accent"
-            >
-              Sign Out
             </button>
           </div>
         </div>

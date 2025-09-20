@@ -3,6 +3,7 @@
 import { useAuth } from "@/app/hooks/auth";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { Loader2 } from "lucide-react";
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -10,35 +11,47 @@ interface AuthGuardProps {
 }
 
 export function AuthGuard({ children, requiredUserId }: AuthGuardProps) {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, isLoading } = useAuth();
   const router = useRouter();
   const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
-    const checkAuth = () => {
-      if (!isAuthenticated) {
-        router.push("/auth/login");
-        return;
-      }
+    // Wait for auth to load
+    if (isLoading) {
+      return;
+    }
 
-      if (requiredUserId && user?.id !== requiredUserId) {
-        router.push(`/${user?.id}/dashboard`);
-        return;
-      }
+    console.log("AuthGuard check:", { 
+      isAuthenticated, 
+      userId: user?.id, 
+      requiredUserId,
+      isLoading 
+    });
 
-      setIsChecking(false);
-    };
+    // Not authenticated - redirect to login
+    if (!isAuthenticated || !user) {
+      console.log("Not authenticated, redirecting to login");
+      router.push("/auth/login");
+      return;
+    }
 
-    // Small delay to ensure auth state is loaded
-    const timer = setTimeout(checkAuth, 100);
-    return () => clearTimeout(timer);
-  }, [isAuthenticated, user, requiredUserId, router]);
+    // Wrong user - redirect to correct user dashboard
+    if (requiredUserId && user.id !== requiredUserId) {
+      console.log("Wrong user, redirecting to correct dashboard");
+      router.push(`/${user.id}/dashboard`);
+      return;
+    }
 
-  if (isChecking) {
+    // All good
+    setIsChecking(false);
+  }, [isAuthenticated, user, requiredUserId, router, isLoading]);
+
+  // Show loading while auth is loading or checking
+  if (isLoading || isChecking) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+          <Loader2 className="h-8 w-8 animate-spin mx-auto" />
           <p className="mt-2 text-sm text-gray-600">Loading...</p>
         </div>
       </div>

@@ -16,13 +16,102 @@ class ApiClient {
   constructor(baseURL: string = process.env.NEXT_PUBLIC_API_URL || "") {
     this.baseURL = baseURL;
     this.loadTokens();
+    console.log("ApiClient initialized with baseURL:", this.baseURL);
   }
 
   private loadTokens() {
     if (typeof window !== "undefined") {
       this.token = localStorage.getItem("access_token");
       this.refreshToken = localStorage.getItem("refresh_token");
+      console.log("Tokens loaded:", { hasToken: !!this.token, hasRefresh: !!this.refreshToken });
     }
+  }
+
+  async login(payload: LoginRequest): Promise<ApiResponse<LoginResponse>> {
+    console.log("🔐 API Login request started");
+    
+    const response = await this.request<LoginResponse>("/auth/login", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+
+    console.log("🔐 API Login response:", { 
+      success: !!response.data, 
+      hasUser: !!response.data?.user,
+      userId: response.data?.user?.id,
+      error: response.error?.detail 
+    });
+
+    if (response.data) {
+      console.log("🔐 Setting tokens and user data");
+      this.setTokensWithUser(
+        response.data.access_token,
+        response.data.refresh_token,
+        response.data.user.id
+      );
+      this.saveUser(response.data.user);
+      console.log("🔐 Tokens and user data saved successfully");
+    }
+
+    return response;
+  }
+
+  setTokensWithUser(accessToken: string, refreshToken: string, userId: string) {
+    console.log("Setting tokens with user:", { userId: userId.substring(0, 8) + "..." });
+    this.setTokens(accessToken, refreshToken);
+
+    if (typeof window !== "undefined") {
+      const secure = window.location.protocol === "https:";
+      document.cookie = `user_id=${userId}; path=/; max-age=${
+        60 * 60 * 24 * 7
+      }; SameSite=strict${secure ? "; Secure" : ""}`;
+    }
+  }
+
+  setTokens(accessToken: string, refreshToken: string) {
+    this.token = accessToken;
+    this.refreshToken = refreshToken;
+
+    if (typeof window !== "undefined") {
+      localStorage.setItem("access_token", accessToken);
+      localStorage.setItem("refresh_token", refreshToken);
+
+      const secure = window.location.protocol === "https:";
+      document.cookie = `access_token=${accessToken}; path=/; max-age=${
+        60 * 60 * 24 * 7
+      }; SameSite=strict${secure ? "; Secure" : ""}`;
+      document.cookie = `refresh_token=${refreshToken}; path=/; max-age=${
+        60 * 60 * 24 * 30
+      }; SameSite=strict${secure ? "; Secure" : ""}`;
+    }
+    console.log("Tokens set successfully");
+  }
+
+  private saveUser(user: any) {
+    if (typeof window !== "undefined" && user) {
+      localStorage.setItem("user", JSON.stringify(user));
+      console.log("User data saved to localStorage:", { userId: user.id });
+    }
+  }
+
+  getUser(): {
+    id: string;
+    email: string;
+    fullName: string;
+    avatar_url?: string;
+  } | null {
+    if (typeof window !== "undefined") {
+      const user = localStorage.getItem("user");
+      const userData = user ? JSON.parse(user) : null;
+      console.log("Getting user from localStorage:", { hasUser: !!userData, userId: userData?.id });
+      return userData;
+    }
+    return null;
+  }
+
+  getToken(): string | null {
+    console.log("Getting token:", { hasToken: !!this.token });
+    return this.token;
   }
 
   private async request<T>(
@@ -30,6 +119,7 @@ class ApiClient {
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
     const url = `${this.baseURL}${endpoint}`;
+    console.log("API Request:", { method: options.method || "GET", url });
 
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
@@ -46,7 +136,10 @@ class ApiClient {
         headers,
       });
 
+      console.log("API Response:", { status: response.status, ok: response.ok });
+
       if (response.status === 401 && this.refreshToken) {
+        console.log("Token expired, attempting refresh...");
         const refreshed = await this.refreshAccessToken();
         if (refreshed) {
           headers.Authorization = `Bearer ${this.token}`;
@@ -107,27 +200,7 @@ class ApiClient {
     });
   }
 
-  async login(payload: LoginRequest): Promise<ApiResponse<LoginResponse>> {
-    const response = await this.request<LoginResponse>("/auth/login", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
-
-    if (response.data) {
-      this.setTokensWithUser(
-        response.data.access_token,
-        response.data.refresh_token,
-        response.data.user.id
-      );
-      this.saveUser(response.data.user);
-    }
-
-    return response;
-  }
-
-  /**
-   * Link GitHub account to authenticated user
-   */
+  // ... rest of the methods remain the same ...
   async linkGitHubAccount(
     forceAccountSelection: boolean = false
   ): Promise<ApiResponse<OAuthInitiateResponse>> {
@@ -145,9 +218,6 @@ class ApiClient {
     return this.request<OAuthInitiateResponse>(endpoint);
   }
 
-  /**
-   * Update/change existing linked GitHub account
-   */
   async updateGitHubAccount(): Promise<ApiResponse<OAuthInitiateResponse>> {
     if (!this.token) {
       return {
@@ -159,9 +229,6 @@ class ApiClient {
     return this.request<OAuthInitiateResponse>("/auth/oauth/github/update");
   }
 
-  /**
-   * Get current GitHub account info
-   */
   async getGitHubInfo(): Promise<ApiResponse<any>> {
     if (!this.token) {
       return {
@@ -173,9 +240,6 @@ class ApiClient {
     return this.request<any>("/auth/oauth/github/info");
   }
 
-  /**
-   * Disconnect GitHub account
-   */
   async disconnectGitHub(): Promise<ApiResponse<{ message: string }>> {
     if (!this.token) {
       return {
@@ -268,42 +332,8 @@ class ApiClient {
     return this.request<ProfileResponse>("/auth/profile");
   }
 
-  setTokens(accessToken: string, refreshToken: string) {
-    this.token = accessToken;
-    this.refreshToken = refreshToken;
-
-    if (typeof window !== "undefined") {
-      localStorage.setItem("access_token", accessToken);
-      localStorage.setItem("refresh_token", refreshToken);
-
-      const secure = window.location.protocol === "https:";
-      document.cookie = `access_token=${accessToken}; path=/; max-age=${
-        60 * 60 * 24 * 7
-      }; SameSite=strict${secure ? "; Secure" : ""}`;
-      document.cookie = `refresh_token=${refreshToken}; path=/; max-age=${
-        60 * 60 * 24 * 30
-      }; SameSite=strict${secure ? "; Secure" : ""}`;
-    }
-  }
-
-  setTokensWithUser(accessToken: string, refreshToken: string, userId: string) {
-    this.setTokens(accessToken, refreshToken);
-
-    if (typeof window !== "undefined") {
-      const secure = window.location.protocol === "https:";
-      document.cookie = `user_id=${userId}; path=/; max-age=${
-        60 * 60 * 24 * 7
-      }; SameSite=strict${secure ? "; Secure" : ""}`;
-    }
-  }
-
-  private saveUser(user: any) {
-    if (typeof window !== "undefined" && user) {
-      localStorage.setItem("user", JSON.stringify(user));
-    }
-  }
-
   clearTokens() {
+    console.log("Clearing all tokens and user data");
     this.token = null;
     this.refreshToken = null;
 
@@ -329,24 +359,9 @@ class ApiClient {
   }
 
   isAuthenticated(): boolean {
-    return !!this.token;
-  }
-
-  getUser(): {
-    id: string;
-    email: string;
-    fullName: string;
-    avatar_url?: string;
-  } | null {
-    if (typeof window !== "undefined") {
-      const user = localStorage.getItem("user");
-      return user ? JSON.parse(user) : null;
-    }
-    return null;
-  }
-
-  getToken(): string | null {
-    return this.token;
+    const authenticated = !!this.token;
+    console.log("Checking authentication:", { authenticated });
+    return authenticated;
   }
 }
 
