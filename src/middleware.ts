@@ -2,100 +2,83 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-// Public routes that don't require authentication
-const publicRoutes = [
+// --- Settings ---------------------------------------------------
+const LOGIN_ROUTE = "/auth/login";
+const PUBLIC_ROUTES = new Set([
   "/auth/login",
   "/auth/signup",
   "/auth/callback",
   "/forgot-password",
   "/reset-password",
-];
+  "/", // landing
+]);
 
-// Protected route patterns
-const protectedRoutePatterns = [
-  /^\/dashboard/,
-  /^\/profile/,
-  /^\/settings/,
-];
+// Dynamic, user-scoped parents we enforce:
+const USER_SCOPED_PREFIXES = [
+  "/dashboard",
+  "/deployments",
+  "/(github)",
+  "/(analysis)",
+] as const;
 
-const LOGIN_ROUTE = "/auth/login";
-const DASHBOARD_ROUTE = "/dashboard";
-const HOME_ROUTE = "/";
+// API base URL
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-export function middleware(request: NextRequest) {
+async function getAuth(request: NextRequest): Promise<{ uid: string } | null> {
+  const accessToken = request.cookies.get("access_token")?.value;
+  const userId = request.cookies.get("user_id")?.value;
+
+  console.log("Auth check:", { 
+    hasToken: !!accessToken, 
+    hasUserId: !!userId, 
+    userId: userId?.substring(0, 8) + "..." 
+  });
+
+  if (!accessToken || !userId) {
+    return null;
+  }
+
+  return { uid: userId };
+}
+
+// Ensure a path is user-scoped (/uid/...); if not, we’ll rewrite/redirect.
+function needsUserScope(pathname: string) {
+  // e.g. "/dashboard" or "/deployments" or "/(github)/..." at root
+  return USER_SCOPED_PREFIXES.some(
+    (p) => pathname === p || pathname.startsWith(`${p}/`)
+  );
+}
+
+// Extract the first segment (potential userId)
+function getFirstSegment(pathname: string) {
+  const [, seg] = pathname.split("/");
+  return seg || "";
+}
+
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Get auth token from cookies
-  const authToken = request.cookies.get("access_token")?.value;
-
-  // 1. Allow Next.js internals, assets, and API routes
+  // Skip static assets and API routes
   if (
     pathname.startsWith("/_next") ||
     pathname.startsWith("/api") ||
-    pathname.startsWith("/static") ||
-    pathname.includes(".") ||
-    pathname.startsWith("/favicon") ||
+    pathname === "/favicon.ico" ||
+    pathname === "/robots.txt" ||
+    pathname === "/sitemap.xml" ||
     pathname.startsWith("/images") ||
-    pathname.startsWith("/icons")
+    pathname.startsWith("/icons") ||
+    pathname.includes(".")
   ) {
     return NextResponse.next();
   }
 
-  // 2. Handle root path "/"
-  if (pathname === HOME_ROUTE) {
-    if (!authToken) {
-      return NextResponse.redirect(new URL(LOGIN_ROUTE, request.url));
-    }
-
-    // If coming from a specific page, allow access to home
-    if (request.nextUrl.searchParams.get("from")) {
-      return NextResponse.next();
-    }
-
-    // If user is authenticated, redirect to dashboard
-    const dashboardUrl = new URL(DASHBOARD_ROUTE, request.url);
-    return NextResponse.redirect(dashboardUrl);
-  }
-
-  // 3. Handle public routes (login, signup, etc.)
-  if (publicRoutes.some((route) => pathname.startsWith(route))) {
-    // If user is already authenticated and trying to access auth pages, redirect to dashboard
-    if (authToken && (pathname.startsWith("/auth/login") || pathname.startsWith("/signup"))) {
-      return NextResponse.redirect(new URL(DASHBOARD_ROUTE, request.url));
-    }
-    // Allow access to public routes
-    return NextResponse.next();
-  }
-
-  // 4. Handle protected routes
-  if (protectedRoutePatterns.some((pattern) => pattern.test(pathname))) {
-    if (!authToken) {
-      const loginUrl = new URL(LOGIN_ROUTE, request.url);
-      loginUrl.searchParams.set("redirectTo", pathname);
-      return NextResponse.redirect(loginUrl);
-    }
-    return NextResponse.next();
-  }
-
-  // 5. Handle any other paths that should be protected by default
-  if (pathname.startsWith("/dashboard") || 
-      pathname.startsWith("/profile") || 
-      pathname.startsWith("/settings")) {
-    if (!authToken) {
-      const loginUrl = new URL(LOGIN_ROUTE, request.url);
-      loginUrl.searchParams.set("redirectTo", pathname);
-      return NextResponse.redirect(loginUrl);
-    }
-    return NextResponse.next();
-  }
-
-  // 6. Default behavior - allow the request
+  // Allow all routes - let client-side auth guards handle authentication
   return NextResponse.next();
 }
 
 export const config = {
+  // Run on all routes except Next.js internals and static files
   matcher: [
-    // Match all paths except Next.js internals and static files
-    "/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)",
+    "/((?!_next|api|favicon.ico|robots.txt|sitemap.xml|images|icons|.*\\.[\\w]+).*)",
   ],
 };

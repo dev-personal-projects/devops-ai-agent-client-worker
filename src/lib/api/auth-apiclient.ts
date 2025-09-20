@@ -13,9 +13,7 @@ class ApiClient {
   private token: string | null = null;
   private refreshToken: string | null = null;
 
-  constructor(
-    baseURL: string = process.env.NEXT_PUBLIC_API_URL ||  ''
-  ) {
+  constructor(baseURL: string = process.env.NEXT_PUBLIC_API_URL || "") {
     this.baseURL = baseURL;
     this.loadTokens();
   }
@@ -116,7 +114,11 @@ class ApiClient {
     });
 
     if (response.data) {
-      this.setTokens(response.data.access_token, response.data.refresh_token);
+      this.setTokensWithUser(
+        response.data.access_token,
+        response.data.refresh_token,
+        response.data.user.id
+      );
       this.saveUser(response.data.user);
     }
 
@@ -139,7 +141,7 @@ class ApiClient {
     const endpoint = forceAccountSelection
       ? "/auth/oauth/github/link?force_reauth=true"
       : "/auth/oauth/github/link";
-    
+
     return this.request<OAuthInitiateResponse>(endpoint);
   }
 
@@ -202,7 +204,7 @@ class ApiClient {
   }): Promise<ApiResponse<LoginResponse>> {
     const isLinking =
       sessionStorage.getItem("github_link_state") === payload.state;
-    const isUpdating = 
+    const isUpdating =
       sessionStorage.getItem("github_update_state") === payload.state;
 
     console.log("OAuth callback:", {
@@ -212,6 +214,9 @@ class ApiClient {
       storedLinkState: sessionStorage.getItem("github_link_state"),
       storedUpdateState: sessionStorage.getItem("github_update_state"),
       receivedState: payload.state,
+      authHeader: this.token
+        ? `Bearer ${this.token.substring(0, 20)}...`
+        : "None",
     });
 
     const requestOptions: RequestInit = {
@@ -232,7 +237,11 @@ class ApiClient {
     );
 
     if (response.data) {
-      this.setTokens(response.data.access_token, response.data.refresh_token);
+      this.setTokensWithUser(
+        response.data.access_token,
+        response.data.refresh_token,
+        response.data.user.id
+      );
       this.saveUser(response.data.user);
 
       // Clear session storage
@@ -277,6 +286,17 @@ class ApiClient {
     }
   }
 
+  setTokensWithUser(accessToken: string, refreshToken: string, userId: string) {
+    this.setTokens(accessToken, refreshToken);
+
+    if (typeof window !== "undefined") {
+      const secure = window.location.protocol === "https:";
+      document.cookie = `user_id=${userId}; path=/; max-age=${
+        60 * 60 * 24 * 7
+      }; SameSite=strict${secure ? "; Secure" : ""}`;
+    }
+  }
+
   private saveUser(user: any) {
     if (typeof window !== "undefined" && user) {
       localStorage.setItem("user", JSON.stringify(user));
@@ -296,6 +316,8 @@ class ApiClient {
         "access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;";
       document.cookie =
         "refresh_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;";
+      document.cookie =
+        "user_id=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;";
     }
   }
 

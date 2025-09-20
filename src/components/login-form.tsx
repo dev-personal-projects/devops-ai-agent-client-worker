@@ -11,12 +11,13 @@ import { z } from "zod";
 import { useAuth } from "@/app/hooks/auth";
 import { LoginRequest } from "@/types/auth/auth.types";
 import { useGitHubOAuth } from "@/app/hooks/useGitHubOAuth";
+import { apiClient } from "@/lib/api/auth-apiclient";
 import { useState } from "react";
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuTrigger 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ChevronDown } from "lucide-react";
 import { Alert, AlertDescription } from "./ui/alert";
@@ -35,7 +36,7 @@ export function LoginForm({
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirectTo") || "/dashboard";
-  
+
   const { login, isLoading, error, clearError } = useAuth();
   const {
     initiateGitHubLogin,
@@ -43,15 +44,15 @@ export function LoginForm({
     error: githubError,
     clearError: clearGitHubError,
   } = useGitHubOAuth();
-  
+
   const [showGitHubOptions, setShowGitHubOptions] = useState(false);
 
   const handleGitHubLogin = async (forceAccountSelection: boolean = false) => {
     clearError();
     clearGitHubError();
-    await initiateGitHubLogin({ 
-      forceAccountSelection, 
-      redirectTo 
+    await initiateGitHubLogin({
+      forceAccountSelection,
+      redirectTo,
     });
   };
 
@@ -69,6 +70,7 @@ export function LoginForm({
 
   const onSubmit = async (data: FormValues) => {
     clearError();
+    console.log("🔐 Starting login process...");
 
     const loginData: LoginRequest = {
       email: data.email,
@@ -76,9 +78,19 @@ export function LoginForm({
     };
 
     const success = await login(loginData);
+    console.log("🔐 Login result:", success);
 
     if (success) {
-      router.push(redirectTo);
+      const userData = apiClient.getUser();
+      const userId = userData?.id;
+
+      if (redirectTo && redirectTo !== "/dashboard") {
+        router.push(redirectTo);
+      } else if (userId) {
+        router.push(`/${userId}/dashboard`);
+      } else {
+        router.push("/dashboard");
+      }
     }
   };
 
@@ -95,9 +107,7 @@ export function LoginForm({
       {/* Show redirect info */}
       {searchParams.get("redirectTo") && (
         <Alert>
-          <AlertDescription>
-            Please login to access that page
-          </AlertDescription>
+          <AlertDescription>Please login to access that page</AlertDescription>
         </Alert>
       )}
 
@@ -129,11 +139,11 @@ export function LoginForm({
               Forgot password?
             </Link>
           </div>
-          <Input 
-            id="password" 
-            type="password" 
+          <Input
+            id="password"
+            type="password"
             autoComplete="current-password"
-            {...register("password")} 
+            {...register("password")}
           />
           {errors.password && (
             <p className="text-xs text-red-500">{errors.password.message}</p>
@@ -171,11 +181,11 @@ export function LoginForm({
             <GitHubLogo className="mr-2 h-4 w-4" />
             {githubLoading ? "Connecting..." : "Continue with GitHub"}
           </Button>
-          
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 size="icon"
                 type="button"
                 disabled={isSubmitting}

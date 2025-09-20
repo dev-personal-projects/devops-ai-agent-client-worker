@@ -43,11 +43,7 @@ export function NavUser() {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [githubInfo, setGithubInfo] = useState<any>(null);
-  const {
-    disconnectGitHub,
-    isLinking,
-    linkError,
-  } = useGitHubLink();
+  const { disconnectGitHub, isLinking, linkError } = useGitHubLink();
 
   useEffect(() => {
     async function fetchProfile() {
@@ -88,6 +84,12 @@ export function NavUser() {
       }
     }
   };
+  const handleLogout = async () => {
+    await logout();
+    window.location.reload();
+  };
+
+  const { isMobile } = useSidebar();
 
   if (loading) {
     return (
@@ -96,8 +98,6 @@ export function NavUser() {
       </div>
     );
   }
-
-  const { isMobile } = useSidebar();
 
   return (
     <SidebarMenu>
@@ -190,7 +190,7 @@ export function NavUser() {
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={handleLogout}>
               <LogOut />
               Log out
             </DropdownMenuItem>

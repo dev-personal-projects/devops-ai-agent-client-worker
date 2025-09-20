@@ -118,8 +118,16 @@ export function useGitHubOAuth() {
             sessionStorage.removeItem("github_oauth_state");
             sessionStorage.removeItem("github_oauth_timestamp");
             sessionStorage.removeItem("github_oauth_redirect");
-            // Redirect to intended destination or dashboard
-            router.push(redirectTo || "/dashboard");
+            // Redirect to intended destination or user-scoped dashboard
+            const userData = apiClient.getUser();
+            const userId = userData?.id;
+            if (redirectTo) {
+              router.push(redirectTo);
+            } else if (userId) {
+              router.push(`/${userId}/dashboard`);
+            } else {
+              router.push("/dashboard");
+            }
           }
           return true;
         }

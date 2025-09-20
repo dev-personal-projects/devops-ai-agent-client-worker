@@ -20,7 +20,7 @@ import {
   SidebarHeader,
   SidebarRail,
 } from "@/components/ui/sidebar";
-import { FaMicrosoft } from "react-icons/fa";
+import { useUserContext } from "@/components/user-provider";
 
 const data = {
   teams: [
@@ -89,7 +89,7 @@ const data = {
         },
       ],
     },
-        {
+    {
       title: "Github Central",
       url: "#",
       icon: LucideGithub,
@@ -101,12 +101,11 @@ const data = {
         {
           title: "Organizations",
           url: "#",
-
         },
         {
           title: "Pull Requests",
           url: "#",
-        }
+        },
       ],
     },
     {
@@ -128,18 +127,37 @@ const data = {
         },
       ],
     },
-
   ],
 };
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const { userId } = useUserContext();
+
+  // Create user-specific navigation data
+  const userNavData = React.useMemo(
+    () => ({
+      teams: data.teams,
+      navMain: data.navMain.map((item) => ({
+        ...item,
+        items: item.items?.map((subItem) => ({
+          ...subItem,
+          url:
+            subItem.url !== "#"
+              ? subItem.url
+              : `/${userId}${getNavUrl(item.title, subItem.title)}`,
+        })),
+      })),
+    }),
+    [userId]
+  );
+
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
-        <TeamSwitcher teams={data.teams} />
+        <TeamSwitcher teams={userNavData.teams} />
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
+        <NavMain items={userNavData.navMain} />
       </SidebarContent>
       <SidebarFooter>
         <NavUser />
@@ -147,4 +165,37 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarRail />
     </Sidebar>
   );
+}
+
+// Helper function to generate navigation URLs
+function getNavUrl(mainTitle: string, subTitle: string): string {
+  const routes: Record<string, Record<string, string>> = {
+    Chat: {
+      "New Chat": "/dashboard",
+      " Chat History": "/dashboard/chat-history",
+    },
+    Analysis: {
+      "Codebase Analysis": "/codebase-scan-analysis",
+      "Infrastructure Analysis": "/infrastructure-analysis",
+      Recommendations: "/recommendations-analysis",
+    },
+    Deployment: {
+      "New Deployment": "/deployments/new",
+      " Manage Deployments": "/deployments",
+      "Deployment Logs": "/deployments/logs",
+      "Deployment Settings": "/deployments/settings",
+    },
+    "Github Central": {
+      Repositories: "/(github)/repositories",
+      Organizations: "/(github)/organizations",
+      "Pull Requests": "/(github)/pull-requests",
+    },
+    Settings: {
+      General: "/settings/general",
+      Team: "/settings/team",
+      Billing: "/settings/billing",
+    },
+  };
+
+  return routes[mainTitle]?.[subTitle] || "/dashboard";
 }

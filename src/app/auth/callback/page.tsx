@@ -6,6 +6,7 @@ import { Suspense } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { AlertCircle, CheckCircle2, Loader2, Link } from "lucide-react";
+import { apiClient } from "@/lib/api/auth-apiclient";
 
 function CallbackHandler() {
   const searchParams = useSearchParams();
@@ -24,7 +25,6 @@ function CallbackHandler() {
 
     // Check if this is a linking flow
     const linkState = sessionStorage.getItem("github_link_state");
-    const oauthState = sessionStorage.getItem("github_oauth_state");
     const linking = linkState === state;
     setIsLinking(linking);
 
@@ -52,13 +52,25 @@ function CallbackHandler() {
           if (linking) {
             sessionStorage.removeItem("github_link_state");
             sessionStorage.removeItem("github_link_timestamp");
-            // Redirect with linked parameter
-            router.push("/dashboard?linked=true");
+            // Get user data to redirect to user-scoped dashboard
+            const userData = apiClient.getUser();
+            const userId = userData?.id;
+            if (userId) {
+              router.push(`/${userId}/dashboard?linked=true`);
+            } else {
+              router.push("/dashboard?linked=true");
+            }
           } else {
             sessionStorage.removeItem("github_oauth_state");
             sessionStorage.removeItem("github_oauth_timestamp");
-            // Regular redirect to dashboard
-            router.push("/dashboard");
+            // Get user data to redirect to user-scoped dashboard
+            const userData = apiClient.getUser();
+            const userId = userData?.id;
+            if (userId) {
+              router.push(`/${userId}/dashboard`);
+            } else {
+              router.push("/dashboard");
+            }
           }
         }
       });
@@ -140,9 +152,15 @@ function CallbackHandler() {
           <div className="mt-4 flex gap-2 justify-center">
             <Button
               variant="outline"
-              onClick={() =>
-                router.push(isLinking ? "/dashboard" : "/auth/login")
-              }
+              onClick={() => {
+                if (isLinking) {
+                  const userData = apiClient.getUser();
+                  const userId = userData?.id;
+                  router.push(userId ? `/${userId}/dashboard` : "/dashboard");
+                } else {
+                  router.push("/auth/login");
+                }
+              }}
             >
               {isLinking ? "Back to Dashboard" : "Back to Login"}
             </Button>
