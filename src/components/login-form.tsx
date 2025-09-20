@@ -8,9 +8,9 @@ import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { z } from "zod";
-import { useAuth } from "@/app/hooks/auth";
+import { useAuth } from "@/hooks/auth";
 import { LoginRequest } from "@/types/auth/auth.types";
-import { useGitHubOAuth } from "@/app/hooks/useGitHubOAuth";
+import { useGitHubOAuth } from "@/hooks/useGitHubOAuth";
 import { apiClient } from "@/lib/api/auth-apiclient";
 import { useState, useEffect } from "react";
 import {
@@ -47,10 +47,8 @@ export function LoginForm({
 
   const [loginAttempted, setLoginAttempted] = useState(false);
 
-  // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated && user && !isLoading) {
-      console.log("User is authenticated, redirecting...", { user: user.id });
       if (redirectTo && redirectTo !== "/dashboard") {
         router.push(redirectTo);
       } else {
@@ -83,7 +81,6 @@ export function LoginForm({
   const onSubmit = async (data: FormValues) => {
     clearError();
     setLoginAttempted(true);
-    console.log("🔐 Starting login process...");
 
     const loginData: LoginRequest = {
       email: data.email,
@@ -91,17 +88,13 @@ export function LoginForm({
     };
 
     const success = await login(loginData);
-    console.log("🔐 Login result:", success);
 
     if (success) {
-      console.log("Login successful, auth state should handle redirect");
-      // Don't manually redirect here - let the useEffect handle it
     } else {
       setLoginAttempted(false);
     }
   };
 
-  // Show loading if we're in the middle of a login attempt
   if (loginAttempted && isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -115,24 +108,12 @@ export function LoginForm({
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
-      {/* Header */}
-      <div className="flex flex-col items-center gap-2 text-center">
-        <h1 className="text-2xl font-bold">Welcome back</h1>
-        <p className="text-muted-foreground text-sm">
-          Enter your credentials to access your account
-        </p>
-      </div>
-
-      {/* Show redirect info */}
       {searchParams.get("redirectTo") && (
         <Alert>
           <AlertDescription>Please login to access that page</AlertDescription>
         </Alert>
       )}
 
-      {/* Form */}
-      <form onSubmit={handleSubmit(onSubmit)} className="grid gap-6">
-        {/* Email */}
         <div className="grid gap-3">
           <Label htmlFor="email">Email</Label>
           <Input
@@ -147,81 +128,18 @@ export function LoginForm({
           )}
         </div>
 
-        {/* Password */}
-        <div className="grid gap-3">
-          <div className="flex items-center">
-            <Label htmlFor="password">Password</Label>
-            <Link
-              href="/auth/forgot-password"
-              className="ml-auto text-xs underline-offset-4 hover:underline"
-            >
-              Forgot password?
-            </Link>
-          </div>
-          <Input
-            id="password"
-            type="password"
-            autoComplete="current-password"
-            {...register("password")}
-          />
-          {errors.password && (
-            <p className="text-xs text-red-500">{errors.password.message}</p>
-          )}
-        </div>
-
-        {/* Error Message */}
         {displayError && (
           <Alert variant="destructive">
             <AlertDescription>{displayError}</AlertDescription>
           </Alert>
         )}
 
-        {/* Submit Button */}
-        <Button type="submit" className="w-full" disabled={isSubmitting}>
-          {isLoading ? "Signing in…" : "Sign in"}
-        </Button>
-
-        {/* Divider */}
         <div className="relative text-center text-sm after:absolute after:inset-0 after:top-1/2 after:border-t after:border-border">
           <span className="relative z-10 bg-background px-2 text-muted-foreground">
             Or continue with
           </span>
         </div>
 
-        {/* GitHub OAuth with dropdown for options */}
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            className="flex-1"
-            type="button"
-            disabled={isSubmitting}
-            onClick={() => handleGitHubLogin(false)}
-          >
-            <GitHubLogo className="mr-2 h-4 w-4" />
-            {githubLoading ? "Connecting..." : "Continue with GitHub"}
-          </Button>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="icon"
-                type="button"
-                disabled={isSubmitting}
-              >
-                <ChevronDown className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => handleGitHubLogin(true)}>
-                Use different GitHub account
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </form>
-
-      {/* Footer */}
       <div className="text-center text-sm">
         Don&apos;t have an account?{" "}
         <Link href="/auth/signup" className="underline underline-offset-4">

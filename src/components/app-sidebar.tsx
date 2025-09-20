@@ -133,7 +133,6 @@ const data = {
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { userId } = useUserContext();
 
-  // Create user-specific navigation data
   const userNavData = React.useMemo(
     () => ({
       teams: data.teams,
@@ -167,7 +166,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   );
 }
 
-// Helper function to generate navigation URLs
 function getNavUrl(mainTitle: string, subTitle: string): string {
   const routes: Record<string, Record<string, string>> = {
     Chat: {

@@ -11,7 +11,7 @@ jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush }),
 }))
 
-jest.mock('@/app/hooks/useGitHubOAuth', () => ({
+jest.mock('@/hooks/useGitHubOAuth', () => ({
   useGitHubOAuth: () => ({
     handleCallback: mockHandleCallback,
     isLoading: true,

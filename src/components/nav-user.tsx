@@ -27,10 +27,10 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { useAuth } from "@/app/hooks/auth";
+import { useAuth } from "@/hooks/auth";
 import { useEffect, useState } from "react";
 import { apiClient } from "@/lib/api/auth-apiclient";
-import { useGitHubLink } from "@/app/hooks/useGitHubLink";
+import { useGitHubLink } from "@/hooks/useGitHubLink";
 
 type User = {
   name: string;
@@ -52,7 +52,6 @@ export function NavUser() {
         const response = await apiClient.getCurrentProfile();
         if (response.data) {
           setProfile(response.data);
-          // Fetch GitHub info if linked
           if (
             response.data.oauth_github_id ||
             response.data.oauth_provider === "github"
@@ -79,7 +78,6 @@ export function NavUser() {
     if (confirm("Are you sure you want to disconnect your GitHub account?")) {
       const success = await disconnectGitHub();
       if (success) {
-        // Refresh profile
         window.location.reload();
       }
     }

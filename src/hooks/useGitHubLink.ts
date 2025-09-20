@@ -45,7 +45,6 @@ export function useGitHubLink() {
     setLinkError(null);
 
     try {
-      // Force GitHub logout for account selection
       const logoutWindow = window.open(
         "https://github.com/logout",
         "github-logout",

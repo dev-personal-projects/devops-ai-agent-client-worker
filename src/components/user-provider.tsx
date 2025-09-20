@@ -1,11 +1,10 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
-import { useAuth } from "@/app/hooks/auth";
+import { useAuth } from "@/hooks/auth";
 import { apiClient } from "@/lib/api/auth-apiclient";
 import { Loader2 } from "lucide-react";
 
-// Types
 interface User {
   id: string;
   email: string;
@@ -32,10 +31,8 @@ interface UserContextType {
   refreshProfile: () => Promise<void>;
 }
 
-// Context
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
-// Hook to use the user context
 export function useUserContext() {
   const context = useContext(UserContext);
   if (!context) {
@@ -44,7 +41,6 @@ export function useUserContext() {
   return context;
 }
 
-// Provider component
 interface UserProviderProps {
   children: React.ReactNode;
   userId: string;
@@ -69,15 +65,12 @@ export function UserProvider({ children, userId }: UserProviderProps) {
       }
     } catch (err) {
       setError("Failed to load profile");
-      console.error("Profile fetch error:", err);
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    // Only load profile if we have a current user
-    // AuthGuard will handle authentication checks
     if (currentUser) {
       refreshProfile();
     } else {
@@ -85,7 +78,6 @@ export function UserProvider({ children, userId }: UserProviderProps) {
     }
   }, [currentUser]);
 
-  // Show error state
   if (error) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -122,7 +114,6 @@ export function UserProvider({ children, userId }: UserProviderProps) {
     );
   }
 
-  // Provide context to children
   const contextValue: UserContextType = {
     userId,
     currentUser,

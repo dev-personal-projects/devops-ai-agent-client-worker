@@ -2,7 +2,6 @@ import { renderHook, act } from '@testing-library/react'
 import { useGitHubOAuth } from '../useGitHubOAuth'
 import { apiClient } from '@/lib/api/auth-apiclient'
 
-// Mock sessionStorage
 const mockSessionStorage = {
   getItem: jest.fn(),
   setItem: jest.fn(),

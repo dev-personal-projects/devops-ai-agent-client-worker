@@ -14,12 +14,9 @@ export function useAuth() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check if user is logged in on mount
     const initializeAuth = () => {
       const storedUser = apiClient.getUser();
       const token = apiClient.getToken();
-
-      console.log("Auth initialization:", { hasToken: !!token, hasUser: !!storedUser });
 
       if (token && storedUser) {
         setUser(storedUser);
@@ -44,10 +41,8 @@ export function useAuth() {
       }
 
       if (response.data) {
-        // Set user state immediately
         setUser(response.data.user);
         
-        // Small delay to ensure state is updated
         await new Promise(resolve => setTimeout(resolve, 100));
         
         setIsLoading(false);
@@ -73,7 +68,6 @@ export function useAuth() {
         return false;
       }
 
-      // Auto-login after successful signup
       if (response.data) {
         const loginSuccess = await login({
           email: userData.email,

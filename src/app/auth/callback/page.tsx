@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { useGitHubOAuth } from "@/app/hooks/useGitHubOAuth";
+import { useGitHubOAuth } from "@/hooks/useGitHubOAuth";
 import { Suspense } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -23,17 +23,13 @@ function CallbackHandler() {
     const errorParam = searchParams.get("error");
     const errorDescription = searchParams.get("error_description");
 
-    // Check if this is a linking flow
     const linkState = sessionStorage.getItem("github_link_state");
     const linking = linkState === state;
     setIsLinking(linking);
 
-    // Handle GitHub OAuth errors
     if (errorParam) {
-      console.error("GitHub OAuth error:", errorParam, errorDescription);
       setProcessed(true);
 
-      // Clear session storage
       if (linking) {
         sessionStorage.removeItem("github_link_state");
         sessionStorage.removeItem("github_link_timestamp");
@@ -48,11 +44,9 @@ function CallbackHandler() {
       setProcessed(true);
       handleCallback(code, state).then((success) => {
         if (success) {
-          // Clear linking state if it was a linking flow
           if (linking) {
             sessionStorage.removeItem("github_link_state");
             sessionStorage.removeItem("github_link_timestamp");
-            // Get user data to redirect to user-scoped dashboard
             const userData = apiClient.getUser();
             const userId = userData?.id;
             if (userId) {
@@ -63,7 +57,6 @@ function CallbackHandler() {
           } else {
             sessionStorage.removeItem("github_oauth_state");
             sessionStorage.removeItem("github_oauth_timestamp");
-            // Get user data to redirect to user-scoped dashboard
             const userData = apiClient.getUser();
             const userId = userData?.id;
             if (userId) {
@@ -79,7 +72,6 @@ function CallbackHandler() {
     }
   }, [searchParams, handleCallback, processed, router]);
 
-  // Handle GitHub OAuth errors
   const githubError = searchParams.get("error");
   if (githubError) {
     const errorDescription = searchParams.get("error_description");
@@ -175,7 +167,6 @@ function CallbackHandler() {
     );
   }
 
-  // Success state (briefly shown before redirect)
   if (processed && !error && !isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">

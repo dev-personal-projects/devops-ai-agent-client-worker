@@ -1,6 +1,6 @@
 "use client";
 
-import { useAuth } from "@/app/hooks/auth";
+import { useAuth } from "@/hooks/auth";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
@@ -16,37 +16,23 @@ export function AuthGuard({ children, requiredUserId }: AuthGuardProps) {
   const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
-    // Wait for auth to load
     if (isLoading) {
       return;
     }
 
-    console.log("AuthGuard check:", { 
-      isAuthenticated, 
-      userId: user?.id, 
-      requiredUserId,
-      isLoading 
-    });
-
-    // Not authenticated - redirect to login
     if (!isAuthenticated || !user) {
-      console.log("Not authenticated, redirecting to login");
       router.push("/auth/login");
       return;
     }
 
-    // Wrong user - redirect to correct user dashboard
     if (requiredUserId && user.id !== requiredUserId) {
-      console.log("Wrong user, redirecting to correct dashboard");
       router.push(`/${user.id}/dashboard`);
       return;
     }
 
-    // All good
     setIsChecking(false);
   }, [isAuthenticated, user, requiredUserId, router, isLoading]);
 
-  // Show loading while auth is loading or checking
   if (isLoading || isChecking) {
     return (
       <div className="flex items-center justify-center min-h-screen">

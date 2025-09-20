@@ -42,7 +42,6 @@ export default function DashboardPage({ params }: DashboardPageProps) {
 
   return (
     <AuthGuard requiredUserId={userId}>
-      {/* Header */}
       <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
         <div className="flex items-center gap-2 px-4">
           <SidebarTrigger className="-ml-1" />
@@ -69,9 +68,7 @@ export default function DashboardPage({ params }: DashboardPageProps) {
         </div>
       </header>
 
-      {/* Main Content */}
       <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-        {/* Welcome Section */}
         <div className="grid auto-rows-min gap-4 md:grid-cols-3">
           <div className="md:col-span-2">
             <Card>
@@ -119,7 +116,6 @@ export default function DashboardPage({ params }: DashboardPageProps) {
           </div>
         </div>
 
-        {/* Quick Actions */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card className="cursor-pointer hover:shadow-md transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -188,7 +184,6 @@ export default function DashboardPage({ params }: DashboardPageProps) {
           </Card>
         </div>
 
-        {/* Recent Activity */}
         <div className="grid gap-4 md:grid-cols-2">
           <Card>
             <CardHeader>

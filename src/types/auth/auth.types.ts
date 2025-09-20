@@ -19,7 +19,6 @@ export interface ProfileResponse {
   bio?: string;
   phone?: string;
   location?: string;
-  // OAuth provider fields - help detect linked accounts
   oauth_provider?: string; // 'github', 'google', etc.
   oauth_github_id?: string; // GitHub user ID if linked
   oauth_google_id?: string; // Google user ID if linked
@@ -51,7 +50,6 @@ export interface ErrorResponse {
   field?: string;
 }
 
-// API Response wrapper for consistent error handling
 export interface ApiResponse<T> {
   data?: T;
   error?: ErrorResponse;

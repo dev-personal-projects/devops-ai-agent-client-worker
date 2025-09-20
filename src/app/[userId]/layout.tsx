@@ -1,6 +1,6 @@
 import { AppSidebar } from "@/components/app-sidebar";
 import { UserProvider } from "@/components/user-provider";
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { Loader2 } from "lucide-react";
@@ -12,7 +12,6 @@ interface UserLayoutProps {
   }>;
 }
 
-// Loading component for the layout
 function LayoutLoading() {
   return (
     <div className="flex h-screen items-center justify-center">
@@ -30,7 +29,6 @@ export default async function UserLayout({
 }: UserLayoutProps) {
   const { userId } = await params;
 
-  // Validate userId format (basic UUID check)
   const uuidRegex =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   if (!uuidRegex.test(userId)) {
@@ -53,7 +51,6 @@ export default async function UserLayout({
   );
 }
 
-// Metadata for SEO and page info
 export async function generateMetadata() {
   return {
     title: "DevOps AI Agent - Dashboard",
@@ -62,8 +59,6 @@ export async function generateMetadata() {
   };
 }
 
-// Static params generation (optional, for optimization)
 export function generateStaticParams() {
-  // Return empty array since user IDs are dynamic
   return [];
 }
