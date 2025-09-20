@@ -1,18 +1,9 @@
 "use client";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { z } from "zod";
-import { useAuth } from "@/hooks/auth";
-import { LoginRequest } from "@/types/auth/auth.types";
+import { useSearchParams } from "next/navigation";
 import { useGitHubOAuth } from "@/hooks/useGitHubOAuth";
-import { apiClient } from "@/lib/api/auth-apiclient";
-import { useState, useEffect } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,22 +13,13 @@ import {
 import { ChevronDown } from "lucide-react";
 import { Alert, AlertDescription } from "./ui/alert";
 
-const schema = z.object({
-  email: z.string().email("Please enter a valid email address"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
-});
-
-type FormValues = z.infer<typeof schema>;
-
 export function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirectTo") || "/dashboard";
 
-  const { login, isLoading, error, clearError, user, isAuthenticated } = useAuth();
   const {
     initiateGitHubLogin,
     isLoading: githubLoading,
@@ -45,20 +27,7 @@ export function LoginForm({
     clearError: clearGitHubError,
   } = useGitHubOAuth();
 
-  const [loginAttempted, setLoginAttempted] = useState(false);
-
-  useEffect(() => {
-    if (isAuthenticated && user && !isLoading) {
-      if (redirectTo && redirectTo !== "/dashboard") {
-        router.push(redirectTo);
-      } else {
-        router.push(`/${user.id}/dashboard`);
-      }
-    }
-  }, [isAuthenticated, user, isLoading, router, redirectTo]);
-
   const handleGitHubLogin = async (forceAccountSelection: boolean = false) => {
-    clearError();
     clearGitHubError();
     await initiateGitHubLogin({
       forceAccountSelection,
@@ -66,83 +35,64 @@ export function LoginForm({
     });
   };
 
-  const displayError = error || githubError;
-  const isSubmitting = isLoading || githubLoading;
-
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<FormValues>({
-    resolver: zodResolver(schema),
-    mode: "onBlur",
-  });
-
-  const onSubmit = async (data: FormValues) => {
-    clearError();
-    setLoginAttempted(true);
-
-    const loginData: LoginRequest = {
-      email: data.email,
-      password: data.password,
-    };
-
-    const success = await login(loginData);
-
-    if (success) {
-    } else {
-      setLoginAttempted(false);
-    }
-  };
-
-  if (loginAttempted && isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="mt-2 text-sm text-gray-600">Signing you in...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className={cn("flex flex-col gap-6", className)} {...props}>
+    <div className={cn("w-full max-w-sm mx-auto space-y-6", className)} {...props}>
+      <div className="text-center space-y-2">
+        <h1 className="text-2xl sm:text-3xl font-bold">Welcome back</h1>
+        <p className="text-muted-foreground text-sm sm:text-base">
+          Sign in with your GitHub account to continue
+        </p>
+      </div>
+
       {searchParams.get("redirectTo") && (
         <Alert>
           <AlertDescription>Please login to access that page</AlertDescription>
         </Alert>
       )}
 
-        <div className="grid gap-3">
-          <Label htmlFor="email">Email</Label>
-          <Input
-            id="email"
-            type="email"
-            placeholder="m@example.com"
-            autoComplete="email"
-            {...register("email")}
-          />
-          {errors.email && (
-            <p className="text-xs text-red-500">{errors.email.message}</p>
-          )}
-        </div>
+      {githubError && (
+        <Alert variant="destructive">
+          <AlertDescription>{githubError}</AlertDescription>
+        </Alert>
+      )}
 
-        {displayError && (
-          <Alert variant="destructive">
-            <AlertDescription>{displayError}</AlertDescription>
-          </Alert>
-        )}
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Button
+            variant="outline"
+            className="flex-1 h-11"
+            type="button"
+            disabled={githubLoading}
+            onClick={() => handleGitHubLogin(false)}
+          >
+            <GitHubLogo className="mr-2 h-5 w-5" />
+            {githubLoading ? "Connecting..." : "Continue with GitHub"}
+          </Button>
 
-        <div className="relative text-center text-sm after:absolute after:inset-0 after:top-1/2 after:border-t after:border-border">
-          <span className="relative z-10 bg-background px-2 text-muted-foreground">
-            Or continue with
-          </span>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-11 w-11"
+                type="button"
+                disabled={githubLoading}
+              >
+                <ChevronDown className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => handleGitHubLogin(true)}>
+                Use different GitHub account
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
+      </div>
 
       <div className="text-center text-sm">
         Don&apos;t have an account?{" "}
-        <Link href="/auth/signup" className="underline underline-offset-4">
+        <Link href="/auth/signup" className="underline underline-offset-4 hover:text-primary">
           Sign up
         </Link>
       </div>

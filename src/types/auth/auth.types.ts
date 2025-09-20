@@ -1,14 +1,3 @@
-export interface SignupRequest {
-  email: string;
-  password: string;
-  full_name: string;
-}
-
-export interface LoginRequest {
-  email: string;
-  password: string;
-}
-
 export interface ProfileResponse {
   id: string;
   email: string;
@@ -19,16 +8,9 @@ export interface ProfileResponse {
   bio?: string;
   phone?: string;
   location?: string;
-  oauth_provider?: string; // 'github', 'google', etc.
-  oauth_github_id?: string; // GitHub user ID if linked
-  oauth_google_id?: string; // Google user ID if linked
-}
-
-export interface SignupResponse {
-  message: string;
-  user_id: string;
-  email: string;
-  full_name: string;
+  oauth_provider?: string;
+  oauth_github_id?: string;
+  oauth_google_id?: string;
 }
 
 export interface LoginResponse {

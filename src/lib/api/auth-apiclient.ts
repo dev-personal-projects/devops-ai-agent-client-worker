@@ -1,11 +1,8 @@
 import {
   ApiResponse,
-  LoginRequest,
   LoginResponse,
   OAuthInitiateResponse,
   ProfileResponse,
-  SignupRequest,
-  SignupResponse,
 } from "@/types/auth/auth.types";
 
 class ApiClient {
@@ -92,35 +89,11 @@ class ApiClient {
         return true;
       }
     } catch (error) {
+      // Token refresh failed
     }
 
     this.clearTokens();
     return false;
-  }
-
-  async signup(payload: SignupRequest): Promise<ApiResponse<SignupResponse>> {
-    return this.request<SignupResponse>("/auth/signup", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
-  }
-
-  async login(payload: LoginRequest): Promise<ApiResponse<LoginResponse>> {
-    const response = await this.request<LoginResponse>("/auth/login", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
-
-    if (response.data) {
-      this.setTokensWithUser(
-        response.data.access_token,
-        response.data.refresh_token,
-        response.data.user.id
-      );
-      this.saveUser(response.data.user);
-    }
-
-    return response;
   }
 
   async linkGitHubAccount(
