@@ -8,6 +8,7 @@ import {
   MessageCircleCode,
   LucideGithub,
   Settings,
+  Home,
 } from "lucide-react";
 
 import { NavMain } from "@/components/nav-main";
@@ -31,6 +32,13 @@ const data = {
     },
   ],
   navMain: [
+    {
+      title: "Dashboard",
+      url: "/dashboard",
+      icon: Home,
+      isActive: true,
+    },
+    
     {
       title: "Chat",
       url: "#",
@@ -168,8 +176,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
 function getNavUrl(mainTitle: string, subTitle: string): string {
   const routes: Record<string, Record<string, string>> = {
+    Dashboard: {
+      "Dashboard": "/dashboard",
+    },
     Chat: {
-      "New Chat": "/dashboard",
+      "New Chat": "/chat",
       " Chat History": "/dashboard/chat-history",
     },
     Analysis: {
