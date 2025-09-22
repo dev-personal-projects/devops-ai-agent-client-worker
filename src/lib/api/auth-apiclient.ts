@@ -1,3 +1,5 @@
+import { BaseApiClient } from "./base-client";
+import { TokenManager } from "./token-manager";
 import {
   ApiResponse,
   LoginResponse,
@@ -5,147 +7,63 @@ import {
   ProfileResponse,
 } from "@/types/auth/auth.types";
 
-class ApiClient {
-  private baseURL: string;
-  private token: string | null = null;
-  private refreshToken: string | null = null;
+class ApiClient extends BaseApiClient {
+  private tokenManager: TokenManager;
 
-  constructor(baseURL: string = process.env.NEXT_PUBLIC_API_URL || "") {
-    this.baseURL = baseURL;
-    this.loadTokens();
+  constructor() {
+    super();
+    this.tokenManager = TokenManager.getInstance();
+    this.tokenManager.loadTokens();
   }
 
-  private loadTokens() {
-    if (typeof window !== "undefined") {
-      this.token = localStorage.getItem("access_token");
-      this.refreshToken = localStorage.getItem("refresh_token");
-    }
-  }
-
-  private async request<T>(
+  private async requestWithAuth<T>(
     endpoint: string,
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
-    const url = `${this.baseURL}${endpoint}`;
+    const token = this.tokenManager.getToken();
+    const response = await this.request<T>(
+      endpoint,
+      options,
+      token ?? undefined
+    );
 
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-      ...(options.headers as Record<string, string>),
-    };
-
-    if (this.token) {
-      headers.Authorization = `Bearer ${this.token}`;
-    }
-
-    try {
-      const response = await fetch(url, {
-        ...options,
-        headers,
-      });
-
-      if (response.status === 401 && this.refreshToken) {
-        const refreshed = await this.refreshAccessToken();
-        if (refreshed) {
-          headers.Authorization = `Bearer ${this.token}`;
-          const retryResponse = await fetch(url, {
-            ...options,
-            headers,
-          });
-          const retryData = await retryResponse.json();
-          return {
-            data: retryResponse.ok ? retryData : undefined,
-            error: !retryResponse.ok ? retryData : undefined,
-            status: retryResponse.status,
-          };
-        }
+    if (response.status === 401 && this.tokenManager.getRefreshToken()) {
+      const refreshed = await this.refreshAccessToken();
+      if (refreshed) {
+        return this.request<T>(
+          endpoint,
+          options,
+          this.tokenManager.getToken() ?? undefined
+        );
       }
-
-      const data = await response.json();
-
-      return {
-        data: response.ok ? data : undefined,
-        error: !response.ok ? data : undefined,
-        status: response.status,
-      };
-    } catch (error) {
-      return {
-        error: { detail: "Network error occurred" },
-        status: 0,
-      };
     }
+
+    return response;
   }
 
   private async refreshAccessToken(): Promise<boolean> {
-    if (!this.refreshToken) return false;
+    const refreshToken = this.tokenManager.getRefreshToken();
+    if (!refreshToken) return false;
 
     try {
       const response = await this.request<LoginResponse>("/auth/refresh", {
         method: "POST",
-        body: JSON.stringify({ refresh_token: this.refreshToken }),
+        body: JSON.stringify({ refresh_token: refreshToken }),
       });
 
       if (response.data) {
-        this.setTokens(response.data.access_token, response.data.refresh_token);
+        this.tokenManager.setTokens(
+          response.data.access_token,
+          response.data.refresh_token
+        );
         return true;
       }
     } catch (error) {
       // Token refresh failed
     }
 
-    this.clearTokens();
+    this.tokenManager.clearTokens();
     return false;
-  }
-
-  async linkGitHubAccount(
-    forceAccountSelection: boolean = false
-  ): Promise<ApiResponse<OAuthInitiateResponse>> {
-    if (!this.token) {
-      return {
-        error: { detail: "Must be logged in to link GitHub account" },
-        status: 401,
-      };
-    }
-
-    const endpoint = forceAccountSelection
-      ? "/auth/oauth/github/link?force_reauth=true"
-      : "/auth/oauth/github/link";
-
-    return this.request<OAuthInitiateResponse>(endpoint);
-  }
-
-  async updateGitHubAccount(): Promise<ApiResponse<OAuthInitiateResponse>> {
-    if (!this.token) {
-      return {
-        error: { detail: "Must be logged in to update GitHub account" },
-        status: 401,
-      };
-    }
-
-    return this.request<OAuthInitiateResponse>("/auth/oauth/github/update");
-  }
-
-  async getGitHubInfo(): Promise<ApiResponse<any>> {
-    if (!this.token) {
-      return {
-        error: { detail: "Must be logged in to access the application" },
-        status: 401,
-      };
-    }
-
-    return this.request<any>("/auth/oauth/github/info");
-  }
-
-  async disconnectGitHub(): Promise<ApiResponse<{ message: string }>> {
-    if (!this.token) {
-      return {
-        error: { detail: "Must be logged in" },
-        status: 401,
-      };
-    }
-
-    return this.request<{ message: string }>("/auth/oauth/github/disconnect", {
-      method: "DELETE",
-    });
   }
 
   async initiateGitHubOAuth(
@@ -161,86 +79,73 @@ class ApiClient {
     code: string;
     state?: string;
   }): Promise<ApiResponse<LoginResponse>> {
-    const isLinking =
-      sessionStorage.getItem("github_link_state") === payload.state;
-    const isUpdating =
-      sessionStorage.getItem("github_update_state") === payload.state;
-
-    const requestOptions: RequestInit = {
-      method: "POST",
-      body: JSON.stringify(payload),
-    };
-
-    if ((isLinking || isUpdating) && this.token) {
-      requestOptions.headers = {
-        ...requestOptions.headers,
-        Authorization: `Bearer ${this.token}`,
-      };
-    }
-
     const response = await this.request<LoginResponse>(
       "/auth/oauth/github/callback",
-      requestOptions
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }
     );
 
     if (response.data) {
-      this.setTokensWithUser(
+      this.tokenManager.setTokens(
         response.data.access_token,
-        response.data.refresh_token,
-        response.data.user.id
+        response.data.refresh_token
       );
+      this.tokenManager.setUserCookie(response.data.user.id);
       this.saveUser(response.data.user);
-
-      if (isLinking) {
-        sessionStorage.removeItem("github_link_state");
-        sessionStorage.removeItem("github_link_timestamp");
-      } else if (isUpdating) {
-        sessionStorage.removeItem("github_update_state");
-        sessionStorage.removeItem("github_update_timestamp");
-      } else {
-        sessionStorage.removeItem("github_oauth_state");
-        sessionStorage.removeItem("github_oauth_timestamp");
-      }
     }
 
     return response;
   }
 
+  async linkGitHubAccount(
+    forceAccountSelection: boolean = false
+  ): Promise<ApiResponse<OAuthInitiateResponse>> {
+    const authError = this.requireAuth(this.tokenManager.getToken());
+    if (authError) return authError;
+
+    const endpoint = forceAccountSelection
+      ? "/auth/oauth/github/link?force_reauth=true"
+      : "/auth/oauth/github/link";
+
+    return this.requestWithAuth<OAuthInitiateResponse>(endpoint);
+  }
+
+  async getGitHubInfo(): Promise<ApiResponse<any>> {
+    const authError = this.requireAuth(this.tokenManager.getToken());
+    if (authError) return authError;
+
+    return this.requestWithAuth<any>("/auth/oauth/github/info");
+  }
+
+  async updateGitHubAccount(): Promise<ApiResponse<OAuthInitiateResponse>> {
+    const authError = this.requireAuth(this.tokenManager.getToken());
+    if (authError) return authError;
+
+    return this.requestWithAuth<OAuthInitiateResponse>(
+      "/auth/oauth/github/update"
+    );
+  }
+
+  async disconnectGitHub(): Promise<ApiResponse<{ message: string }>> {
+    const authError = this.requireAuth(this.tokenManager.getToken());
+    if (authError) return authError;
+
+    return this.requestWithAuth<{ message: string }>(
+      "/auth/oauth/github/disconnect",
+      {
+        method: "DELETE",
+      }
+    );
+  }
+
   async getProfile(userId: string): Promise<ApiResponse<ProfileResponse>> {
-    return this.request<ProfileResponse>(`/auth/profile/${userId}`);
+    return this.requestWithAuth<ProfileResponse>(`/auth/profile/${userId}`);
   }
 
   async getCurrentProfile(): Promise<ApiResponse<ProfileResponse>> {
-    return this.request<ProfileResponse>("/auth/profile");
-  }
-
-  setTokens(accessToken: string, refreshToken: string) {
-    this.token = accessToken;
-    this.refreshToken = refreshToken;
-
-    if (typeof window !== "undefined") {
-      localStorage.setItem("access_token", accessToken);
-      localStorage.setItem("refresh_token", refreshToken);
-
-      const secure = window.location.protocol === "https:";
-      document.cookie = `access_token=${accessToken}; path=/; max-age=${
-        60 * 60 * 24 * 7
-      }; SameSite=strict${secure ? "; Secure" : ""}`;
-      document.cookie = `refresh_token=${refreshToken}; path=/; max-age=${
-        60 * 60 * 24 * 30
-      }; SameSite=strict${secure ? "; Secure" : ""}`;
-    }
-  }
-
-  setTokensWithUser(accessToken: string, refreshToken: string, userId: string) {
-    this.setTokens(accessToken, refreshToken);
-
-    if (typeof window !== "undefined") {
-      const secure = window.location.protocol === "https:";
-      document.cookie = `user_id=${userId}; path=/; max-age=${
-        60 * 60 * 24 * 7
-      }; SameSite=strict${secure ? "; Secure" : ""}`;
-    }
+    return this.requestWithAuth<ProfileResponse>("/auth/profile");
   }
 
   private saveUser(user: any) {
@@ -249,41 +154,18 @@ class ApiClient {
     }
   }
 
-  clearTokens() {
-    this.token = null;
-    this.refreshToken = null;
-
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
-      localStorage.removeItem("user");
-
-      document.cookie =
-        "access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;";
-      document.cookie =
-        "refresh_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;";
-      document.cookie =
-        "user_id=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;";
-    }
-  }
-
   logout() {
-    this.clearTokens();
+    this.tokenManager.clearTokens();
     if (typeof window !== "undefined") {
       window.location.href = "/auth/login";
     }
   }
 
   isAuthenticated(): boolean {
-    return !!this.token;
+    return !!this.tokenManager.getToken();
   }
 
-  getUser(): {
-    id: string;
-    email: string;
-    fullName: string;
-    avatar_url?: string;
-  } | null {
+  getUser() {
     if (typeof window !== "undefined") {
       const user = localStorage.getItem("user");
       return user ? JSON.parse(user) : null;
@@ -292,7 +174,7 @@ class ApiClient {
   }
 
   getToken(): string | null {
-    return this.token;
+    return this.tokenManager.getToken();
   }
 }
 

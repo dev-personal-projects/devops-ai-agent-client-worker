@@ -92,7 +92,7 @@ export function GlobalNotFound({
   description = "The page you're looking for doesn't exist or has been moved to a different location.",
   showQuickLinks = true,
   showSearch = true,
-  homeUrl = "/",
+  homeUrl = "/{userId}/dashboard",
   className = ""
 }: NotFoundProps) {
   const [searchQuery, setSearchQuery] = useState("");

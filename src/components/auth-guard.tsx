@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/auth";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
+import { GlobalLoading } from "./global-loading";
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -36,9 +37,8 @@ export function AuthGuard({ children, requiredUserId }: AuthGuardProps) {
   if (isLoading || isChecking) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto" />
-          <p className="mt-2 text-sm text-gray-600">Loading...</p>
+        <div className="mt-2 text-sm text-gray-600">
+          <GlobalLoading />
         </div>
       </div>
     );

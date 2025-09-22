@@ -3,7 +3,6 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { useAuth } from "@/hooks/auth";
 import { apiClient } from "@/lib/api/auth-apiclient";
-import { Loader2 } from "lucide-react";
 
 interface User {
   id: string;
