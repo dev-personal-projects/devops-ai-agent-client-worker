@@ -1,9 +1,13 @@
-import React from 'react'
+import {
+  LoadingGrid,
+  PageLoadingSpinner,
+} from "@/components/github/loading-states";
 
-const LoadingPage = () => {
+export default function LoadingPage() {
   return (
-    <div>LoadingPage</div>
-  )
+    <div className="space-y-6">
+      <PageLoadingSpinner message="Loading pull requests..." />
+      <LoadingGrid type="pullRequests" count={4} />
+    </div>
+  );
 }
-
-export default LoadingPage

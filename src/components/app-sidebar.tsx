@@ -146,12 +146,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       teams: data.teams,
       navMain: data.navMain.map((item) => ({
         ...item,
+        url: item.url !== "#" ? `/${userId}${item.url}` : "#",
         items: item.items?.map((subItem) => ({
           ...subItem,
-          url:
-            subItem.url !== "#"
-              ? subItem.url
-              : `/${userId}${getNavUrl(item.title, subItem.title)}`,
+          url: subItem.url !== "#" ? subItem.url : `/${userId}${getNavUrl(item.title, subItem.title)}`,
         })),
       })),
     }),
@@ -186,18 +184,12 @@ function getNavUrl(mainTitle: string, subTitle: string): string {
     Analysis: {
       "Codebase Analysis": "/codebase-scan-analysis",
       "Infrastructure Analysis": "/infrastructure-analysis",
-      Recommendations: "/recommendations-analysis",
-    },
-    Deployment: {
-      "New Deployment": "/deployments/new",
-      " Manage Deployments": "/deployments",
-      "Deployment Logs": "/deployments/logs",
-      "Deployment Settings": "/deployments/settings",
+      "Recommendations & Insights": "/recommendations-analysis",
     },
     "Github Central": {
-      Repositories: "/(github)/repositories",
-      Organizations: "/(github)/organizations",
-      "Pull Requests": "/(github)/pull-requests",
+      "Repositories": "/repositories",
+      "Organizations": "/organizations", 
+      "Pull Requests": "/pull-requests",
     },
     Settings: {
       General: "/settings/general",

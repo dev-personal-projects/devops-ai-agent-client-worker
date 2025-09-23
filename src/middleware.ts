@@ -17,6 +17,13 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  const accessToken = request.cookies.get("access_token")?.value;
+  const userId = request.cookies.get("user_id")?.value;
+
+  if (accessToken && userId && (pathname === "/" || pathname.startsWith("/auth"))) {
+    return NextResponse.redirect(new URL(`/${userId}/dashboard`, request.url));
+  }
+
   return NextResponse.next();
 }
 
