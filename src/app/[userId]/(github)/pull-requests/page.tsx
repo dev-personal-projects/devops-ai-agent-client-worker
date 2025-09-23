@@ -7,8 +7,7 @@ import {
   PullRequest,
   PullRequestState,
 } from "@/types/github/pull-request/pullrequest";
-import { Repository } from "@/types/github/repositories/repositories";
-import { PullRequestCard } from "@/components/github/pull-request";
+import { PullRequestCard } from "@/components/github/pull-request-card";
 import {
   LoadingGrid,
   EmptyState,
@@ -36,14 +35,19 @@ import {
   AlertCircle,
 } from "lucide-react";
 
+interface PullRequestWithRepo extends PullRequest {
+  repositoryInfo: {
+    owner: string;
+    name: string;
+    fullName: string;
+  };
+}
+
 export default function PullRequestsPage() {
   const params = useParams();
   const userId = params.userId as string;
 
-  const [repositories, setRepositories] = useState<Repository[]>([]);
-  const [pullRequests, setPullRequests] = useState<
-    Record<string, PullRequest[]>
-  >({});
+  const [pullRequests, setPullRequests] = useState<PullRequestWithRepo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -60,46 +64,53 @@ export default function PullRequestsPage() {
       setLoading(true);
       setError(null);
 
-      // First get repositories
-      const reposResponse = await githubClient.repositories.getRepositories();
+      // Use the new efficient endpoint to get all user pull requests
+      const [openResponse, closedResponse] = await Promise.all([
+        githubClient.pullRequests.getUserPullRequests(
+          PullRequestState.OPEN,
+          50
+        ),
+        githubClient.pullRequests.getUserPullRequests(
+          PullRequestState.CLOSED,
+          25
+        ),
+      ]);
 
-      if (reposResponse.error) {
-        throw new Error(
-          reposResponse.error.detail || "Failed to fetch repositories"
-        );
+      const allPullRequests: PullRequestWithRepo[] = [];
+
+      // Process open PRs
+      if (openResponse.data) {
+        const openPRsWithRepo = openResponse.data.map((pr) => ({
+          ...pr,
+          repositoryInfo: {
+            owner: pr.base?.repo?.full_name?.split("/")[0] || "unknown",
+            name: pr.base?.repo?.name || "unknown",
+            fullName: pr.base?.repo?.full_name || "unknown/unknown",
+          },
+        }));
+        allPullRequests.push(...openPRsWithRepo);
       }
 
-      const repos = reposResponse.data!.repositories;
-      setRepositories(repos);
+      // Process closed PRs
+      if (closedResponse.data) {
+        const closedPRsWithRepo = closedResponse.data.map((pr) => ({
+          ...pr,
+          repositoryInfo: {
+            owner: pr.base?.repo?.full_name?.split("/")[0] || "unknown",
+            name: pr.base?.repo?.name || "unknown",
+            fullName: pr.base?.repo?.full_name || "unknown/unknown",
+          },
+        }));
+        allPullRequests.push(...closedPRsWithRepo);
+      }
 
-      // Fetch pull requests for each repository (limit to first 5 repos for performance)
-      const reposToFetch = repos.slice(0, 5);
-      const prPromises = reposToFetch.map(async (repo) => {
-        try {
-          const response = await githubClient.pullRequests.getPullRequests(
-            repo.owner.login,
-            repo.name,
-            PullRequestState.OPEN,
-            20
-          );
-          return {
-            repoId: repo.id.toString(),
-            prs: response.data || [],
-          };
-        } catch (err) {
-          console.warn(`Failed to fetch PRs for ${repo.full_name}:`, err);
-          return { repoId: repo.id.toString(), prs: [] };
-        }
-      });
+      setPullRequests(allPullRequests);
 
-      const results = await Promise.all(prPromises);
-      const prsByRepo: Record<string, PullRequest[]> = {};
-
-      results.forEach(({ repoId, prs }) => {
-        prsByRepo[repoId] = prs;
-      });
-
-      setPullRequests(prsByRepo);
+      if (openResponse.error && closedResponse.error) {
+        throw new Error(
+          openResponse.error.detail || "Failed to fetch pull requests"
+        );
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
@@ -117,10 +128,7 @@ export default function PullRequestsPage() {
     fetchData();
   }, []);
 
-  // Flatten all pull requests
-  const allPullRequests = Object.values(pullRequests).flat();
-
-  const filteredPullRequests = allPullRequests
+  const filteredPullRequests = pullRequests
     .filter((pr) => {
       // Filter by state/tab
       switch (activeTab) {
@@ -141,7 +149,8 @@ export default function PullRequestsPage() {
         return (
           pr.title.toLowerCase().includes(searchLower) ||
           pr.body?.toLowerCase().includes(searchLower) ||
-          pr.user.login.toLowerCase().includes(searchLower)
+          pr.user.login.toLowerCase().includes(searchLower) ||
+          pr.repositoryInfo.fullName.toLowerCase().includes(searchLower)
         );
       }
       return true;
@@ -149,18 +158,23 @@ export default function PullRequestsPage() {
     .filter((pr) => {
       // Repository filter
       if (selectedRepo !== "all") {
-        return pr.base.repo.id.toString() === selectedRepo;
+        return pr.repositoryInfo.fullName === selectedRepo;
       }
       return true;
     });
 
-  const openCount = allPullRequests.filter(
+  const openCount = pullRequests.filter(
     (pr) => pr.state === PullRequestState.OPEN && !pr.merged
   ).length;
-  const closedCount = allPullRequests.filter(
+  const closedCount = pullRequests.filter(
     (pr) => pr.state === PullRequestState.CLOSED && !pr.merged
   ).length;
-  const mergedCount = allPullRequests.filter((pr) => pr.merged).length;
+  const mergedCount = pullRequests.filter((pr) => pr.merged).length;
+
+  // Get unique repositories for filter dropdown
+  const uniqueRepositories = Array.from(
+    new Set(pullRequests.map((pr) => pr.repositoryInfo.fullName))
+  ).sort();
 
   if (loading) {
     return (
@@ -188,8 +202,8 @@ export default function PullRequestsPage() {
         <div>
           <h1 className="text-3xl font-bold">Pull Requests</h1>
           <p className="text-muted-foreground">
-            {allPullRequests.length} pull requests across{" "}
-            {Object.keys(pullRequests).length} repositories
+            {pullRequests.length} pull requests across{" "}
+            {uniqueRepositories.length} repositories
           </p>
         </div>
 
@@ -219,9 +233,9 @@ export default function PullRequestsPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All repositories</SelectItem>
-            {repositories.map((repo, index) => (
-              <SelectItem key={`${repo.id}-${repo.full_name}-${index}`} value={repo.id.toString()}>
-                {repo.name}
+            {uniqueRepositories.map((repoName) => (
+              <SelectItem key={repoName} value={repoName}>
+                {repoName.split("/")[1]}
               </SelectItem>
             ))}
           </SelectContent>
@@ -255,7 +269,7 @@ export default function PullRequestsPage() {
               description={
                 searchTerm || selectedRepo !== "all"
                   ? "Try adjusting your search or filter criteria."
-                  : `There are no ${activeTab} pull requests in your repositories.`
+                  : `You don't have any ${activeTab} pull requests.`
               }
               icon={
                 <GitPullRequest className="h-8 w-8 text-muted-foreground" />
@@ -264,7 +278,11 @@ export default function PullRequestsPage() {
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {filteredPullRequests.map((pr) => (
-                <PullRequestCard key={pr.id} pullRequest={pr} userId={userId} />
+                <PullRequestCard
+                  key={`${pr.repositoryInfo.fullName}-${pr.id}`}
+                  pullRequest={pr}
+                  userId={userId}
+                />
               ))}
             </div>
           )}
@@ -272,7 +290,7 @@ export default function PullRequestsPage() {
       </Tabs>
 
       {/* Summary Stats */}
-      {allPullRequests.length > 0 && (
+      {pullRequests.length > 0 && (
         <div className="flex flex-wrap gap-4 pt-4 border-t">
           <Badge variant="secondary" className="px-3 py-1">
             <GitPullRequest className="h-3 w-3 mr-1" />
@@ -291,7 +309,7 @@ export default function PullRequestsPage() {
 
           <Badge variant="secondary" className="px-3 py-1">
             <AlertCircle className="h-3 w-3 mr-1" />
-            {allPullRequests.filter((pr) => pr.mergeable === false).length}{" "}
+            {pullRequests.filter((pr) => pr.mergeable === false).length}{" "}
             Conflicts
           </Badge>
         </div>

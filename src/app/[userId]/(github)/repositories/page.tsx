@@ -231,9 +231,9 @@ export default function RepositoriesPage() {
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredAndSortedRepos.map((repo) => (
+          {filteredAndSortedRepos.map((repo, index) => (
             <RepositoryCard 
-              key={repo.id} 
+              key={`${repo.id}-${repo.full_name}-${index}`} 
               repository={repo} 
               userId={userId}
             />
