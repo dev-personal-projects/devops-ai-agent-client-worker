@@ -1,6 +1,6 @@
 "use client";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/api/utils/utils";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useGitHubOAuth } from "@/hooks/useGitHubOAuth";
@@ -36,7 +36,10 @@ export function LoginForm({
   };
 
   return (
-    <div className={cn("w-full max-w-sm mx-auto space-y-6", className)} {...props}>
+    <div
+      className={cn("w-full max-w-sm mx-auto space-y-6", className)}
+      {...props}
+    >
       <div className="text-center space-y-2">
         <h1 className="text-2xl sm:text-3xl font-bold">Welcome back</h1>
         <p className="text-muted-foreground text-sm sm:text-base">
@@ -92,7 +95,10 @@ export function LoginForm({
 
       <div className="text-center text-sm">
         Don&apos;t have an account?{" "}
-        <Link href="/auth/signup" className="underline underline-offset-4 hover:text-primary">
+        <Link
+          href="/auth/signup"
+          className="underline underline-offset-4 hover:text-primary"
+        >
           Sign up
         </Link>
       </div>

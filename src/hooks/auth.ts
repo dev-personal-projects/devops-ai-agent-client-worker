@@ -1,5 +1,5 @@
 "use client";
-import { apiClient } from "@/lib/api/auth-apiclient";
+import { apiClient } from "@/lib/api/auth/auth-apiclient";
 import { useState, useEffect } from "react";
 
 export function useAuth() {

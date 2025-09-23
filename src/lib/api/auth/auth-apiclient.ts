@@ -1,5 +1,5 @@
-import { BaseApiClient } from "./base-client";
-import { TokenManager } from "./token-manager";
+import { BaseApiClient } from "../base-client";
+import { TokenManager } from "../token/token-manager";
 import {
   ApiResponse,
   LoginResponse,

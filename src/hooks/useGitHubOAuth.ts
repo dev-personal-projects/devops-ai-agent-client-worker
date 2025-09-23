@@ -1,4 +1,4 @@
-import { apiClient } from "@/lib/api/auth-apiclient";
+import { apiClient } from "@/lib/api/auth/auth-apiclient";
 import { useRouter } from "next/navigation";
 import { useState, useCallback } from "react";
 

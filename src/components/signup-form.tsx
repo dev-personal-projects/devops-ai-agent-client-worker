@@ -1,6 +1,6 @@
 "use client";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/api/utils/utils";
 import Link from "next/link";
 import { useGitHubOAuth } from "@/hooks/useGitHubOAuth";
 import {
@@ -31,7 +31,10 @@ export function SignupForm({
   };
 
   return (
-    <div className={cn("w-full max-w-sm mx-auto space-y-6", className)} {...props}>
+    <div
+      className={cn("w-full max-w-sm mx-auto space-y-6", className)}
+      {...props}
+    >
       <div className="text-center space-y-2">
         <h1 className="text-2xl sm:text-3xl font-bold">Create your account</h1>
         <p className="text-muted-foreground text-sm sm:text-base">
@@ -81,7 +84,10 @@ export function SignupForm({
 
       <div className="text-center text-sm">
         Already have an account?{" "}
-        <Link href="/auth/login" className="underline underline-offset-4 hover:text-primary">
+        <Link
+          href="/auth/login"
+          className="underline underline-offset-4 hover:text-primary"
+        >
           Log in
         </Link>
       </div>

@@ -6,7 +6,7 @@ import { Suspense } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { AlertCircle, CheckCircle2, Loader2, Link } from "lucide-react";
-import { apiClient } from "@/lib/api/auth-apiclient";
+import { apiClient } from "@/lib/api/auth/auth-apiclient";
 
 function CallbackHandler() {
   const searchParams = useSearchParams();

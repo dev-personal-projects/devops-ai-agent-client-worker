@@ -1,4 +1,4 @@
-import { apiClient } from "@/lib/api/auth-apiclient";
+import { apiClient } from "@/lib/api/auth/auth-apiclient";
 import { useState } from "react";
 
 export function useGitHubLink() {
@@ -16,7 +16,7 @@ export function useGitHubLink() {
           "github-logout",
           "width=500,height=600"
         );
-        
+
         await new Promise((resolve) => setTimeout(resolve, 1500));
         logoutWindow?.close();
       }
@@ -26,7 +26,7 @@ export function useGitHubLink() {
       if (response.error) {
         setLinkError(response.error.detail);
         setIsLinking(false);
-        return; 
+        return;
       }
 
       if (response.data) {
@@ -50,7 +50,7 @@ export function useGitHubLink() {
         "github-logout",
         "width=500,height=600"
       );
-      
+
       await new Promise((resolve) => setTimeout(resolve, 1500));
       logoutWindow?.close();
 
@@ -64,7 +64,10 @@ export function useGitHubLink() {
 
       if (response.data) {
         sessionStorage.setItem("github_update_state", response.data.state);
-        sessionStorage.setItem("github_update_timestamp", Date.now().toString());
+        sessionStorage.setItem(
+          "github_update_timestamp",
+          Date.now().toString()
+        );
         window.location.href = response.data.auth_url;
       }
     } catch (error) {

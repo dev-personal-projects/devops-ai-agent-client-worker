@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/sidebar";
 import { useAuth } from "@/hooks/auth";
 import { useEffect, useState } from "react";
-import { apiClient } from "@/lib/api/auth-apiclient";
+import { apiClient } from "@/lib/api/auth/auth-apiclient";
 import { useGitHubLink } from "@/hooks/useGitHubLink";
 
 type User = {
@@ -102,9 +102,7 @@ export function NavUser() {
       <SidebarMenuItem>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <SidebarMenuButton
-              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-            >
+            <SidebarMenuButton className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground">
               <Avatar className="h-8 w-8 rounded-lg">
                 <AvatarImage
                   src={profile?.avatar_url || user?.avatar_url || ""}
