@@ -35,6 +35,57 @@ import {
   AlertCircle,
 } from "lucide-react";
 
+// GitHub Search API returns different structure than direct PR API
+interface GitHubSearchIssue {
+  id: number;
+  number: number;
+  title: string;
+  body?: string;
+  state: string;
+  locked: boolean;
+  user: {
+    login: string;
+    id: number;
+    avatar_url?: string;
+    html_url: string;
+  };
+  labels: Array<{
+    id: number;
+    name: string;
+    color: string;
+    description?: string;
+  }>;
+  assignees: any[];
+  milestone?: {
+    id: number;
+    title: string;
+    description?: string;
+  };
+  comments: number;
+  created_at: string;
+  updated_at: string;
+  closed_at?: string;
+  html_url: string;
+  repository_url: string;
+  pull_request?: {
+    url: string;
+    html_url: string;
+    diff_url: string;
+    patch_url: string;
+  };
+  // Additional fields that might be present
+  repository?: {
+    id: number;
+    name: string;
+    full_name: string;
+    owner: {
+      login: string;
+      id: number;
+    };
+    html_url: string;
+  };
+}
+
 interface PullRequestWithRepo extends PullRequest {
   repositoryInfo: {
     owner: string;
@@ -59,12 +110,146 @@ export default function PullRequestsPage() {
 
   const githubClient = new GitHubApiClient();
 
+  // Helper function to extract repository info from different API structures
+  const extractRepositoryInfo = (item: any) => {
+    // Try multiple ways to get repository info
+    let owner = "unknown";
+    let name = "unknown";
+    let fullName = "unknown/unknown";
+
+    // Method 1: from repository object (search API)
+    if (item.repository) {
+      owner =
+        item.repository.owner?.login || item.repository.owner || "unknown";
+      name = item.repository.name || "unknown";
+      fullName = item.repository.full_name || `${owner}/${name}`;
+    }
+    // Method 2: from repository_url (search API)
+    else if (item.repository_url) {
+      const match = item.repository_url.match(/repos\/([^\/]+)\/([^\/]+)$/);
+      if (match) {
+        owner = match[1];
+        name = match[2];
+        fullName = `${owner}/${name}`;
+      }
+    }
+    // Method 3: from html_url
+    else if (item.html_url) {
+      const match = item.html_url.match(
+        /github\.com\/([^\/]+)\/([^\/]+)\/pull/
+      );
+      if (match) {
+        owner = match[1];
+        name = match[2];
+        fullName = `${owner}/${name}`;
+      }
+    }
+    // Method 4: from base.repo (direct PR API)
+    else if (item.base?.repo) {
+      owner = item.base.repo.owner?.login || "unknown";
+      name = item.base.repo.name || "unknown";
+      fullName = item.base.repo.full_name || `${owner}/${name}`;
+    }
+
+    return { owner, name, fullName };
+  };
+
+  // Helper function to normalize PR data from different API sources
+  const normalizePullRequest = (
+    item: GitHubSearchIssue | PullRequest
+  ): PullRequestWithRepo => {
+    const repositoryInfo = extractRepositoryInfo(item);
+
+    // Create a normalized PR object
+    const normalizedPR: PullRequestWithRepo = {
+      id: item.id,
+      number: item.number,
+      title: item.title,
+      body: item.body,
+      state: item.state as PullRequestState,
+      locked: item.locked,
+      user: item.user,
+      assignees: item.assignees || [],
+      reviewers: [], // Search API doesn't include reviewers
+      labels: item.labels || [],
+      milestone: item.milestone,
+      // Default values for fields that might not be in search API
+      head: {
+        label: `${repositoryInfo.owner}:unknown`,
+        ref: "unknown",
+        sha: "unknown",
+        repo: {
+          id: 0,
+          name: repositoryInfo.name,
+          full_name: repositoryInfo.fullName,
+          html_url: `https://github.com/${repositoryInfo.fullName}`,
+        },
+      },
+      base: {
+        label: `${repositoryInfo.owner}:main`,
+        ref: "main",
+        sha: "unknown",
+        repo: {
+          id: 0,
+          name: repositoryInfo.name,
+          full_name: repositoryInfo.fullName,
+          html_url: `https://github.com/${repositoryInfo.fullName}`,
+        },
+      },
+      html_url: item.html_url,
+      diff_url: item.html_url.replace("/pull/", "/pull/") + ".diff",
+      patch_url: item.html_url.replace("/pull/", "/pull/") + ".patch",
+      mergeable: false, // Unknown from search API
+      mergeable_state: "unknown" as any,
+      merged: false, // Will be set based on state
+      merged_at: undefined,
+      merged_by: undefined,
+      comments: item.comments,
+      review_comments: 0, // Unknown from search API
+      commits: 0, // Unknown from search API
+      additions: 0, // Unknown from search API
+      deletions: 0, // Unknown from search API
+      changed_files: 0, // Unknown from search API
+      created_at: item.created_at,
+      updated_at: item.updated_at,
+      closed_at: item.closed_at,
+      draft: false, // Unknown from search API
+      repositoryInfo,
+    };
+
+    // If this is already a full PR object (from direct API), preserve its data
+    if ("head" in item && "base" in item) {
+      const fullPR = item as PullRequest;
+      normalizedPR.head = fullPR.head;
+      normalizedPR.base = fullPR.base;
+      normalizedPR.mergeable = fullPR.mergeable;
+      normalizedPR.mergeable_state = fullPR.mergeable_state;
+      normalizedPR.merged = fullPR.merged;
+      normalizedPR.merged_at = fullPR.merged_at;
+      normalizedPR.merged_by = fullPR.merged_by;
+      normalizedPR.review_comments = fullPR.review_comments;
+      normalizedPR.commits = fullPR.commits;
+      normalizedPR.additions = fullPR.additions;
+      normalizedPR.deletions = fullPR.deletions;
+      normalizedPR.changed_files = fullPR.changed_files;
+      normalizedPR.draft = fullPR.draft;
+    }
+
+    // Determine if merged based on state
+    if (item.state === "closed" && item.closed_at) {
+      // This is a heuristic - we can't know for sure from search API
+      normalizedPR.merged = false; // Assume closed = not merged, would need individual PR fetch to know for sure
+    }
+
+    return normalizedPR;
+  };
+
   const fetchData = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      // Use the new efficient endpoint to get all user pull requests
+      // Use the efficient endpoint to get all user pull requests
       const [openResponse, closedResponse] = await Promise.all([
         githubClient.pullRequests.getUserPullRequests(
           PullRequestState.OPEN,
@@ -80,27 +265,17 @@ export default function PullRequestsPage() {
 
       // Process open PRs
       if (openResponse.data) {
-        const openPRsWithRepo = openResponse.data.map((pr) => ({
-          ...pr,
-          repositoryInfo: {
-            owner: pr.base?.repo?.full_name?.split("/")[0] || "unknown",
-            name: pr.base?.repo?.name || "unknown",
-            fullName: pr.base?.repo?.full_name || "unknown/unknown",
-          },
-        }));
+        const openPRsWithRepo = openResponse.data.map((pr) =>
+          normalizePullRequest(pr)
+        );
         allPullRequests.push(...openPRsWithRepo);
       }
 
       // Process closed PRs
       if (closedResponse.data) {
-        const closedPRsWithRepo = closedResponse.data.map((pr) => ({
-          ...pr,
-          repositoryInfo: {
-            owner: pr.base?.repo?.full_name?.split("/")[0] || "unknown",
-            name: pr.base?.repo?.name || "unknown",
-            fullName: pr.base?.repo?.full_name || "unknown/unknown",
-          },
-        }));
+        const closedPRsWithRepo = closedResponse.data.map((pr) =>
+          normalizePullRequest(pr)
+        );
         allPullRequests.push(...closedPRsWithRepo);
       }
 
@@ -112,6 +287,7 @@ export default function PullRequestsPage() {
         );
       }
     } catch (err) {
+      console.error("Error fetching pull requests:", err);
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
       setLoading(false);
@@ -174,7 +350,9 @@ export default function PullRequestsPage() {
   // Get unique repositories for filter dropdown
   const uniqueRepositories = Array.from(
     new Set(pullRequests.map((pr) => pr.repositoryInfo.fullName))
-  ).sort();
+  )
+    .filter((name) => name !== "unknown/unknown")
+    .sort();
 
   if (loading) {
     return (

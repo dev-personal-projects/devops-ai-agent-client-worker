@@ -1,18 +1,14 @@
-"use client";
+'use client';
 
-import {
-  PullRequest,
-  PullRequestState,
-  MergeableState,
-} from "@/types/github/pull-request/pullrequest";
+import { PullRequest, PullRequestState, MergeableState } from "@/types/github/pull-request/pullrequest";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import {
-  GitPullRequest,
-  GitMerge,
-  MessageSquare,
+import { 
+  GitPullRequest, 
+  GitMerge, 
+  MessageSquare, 
   GitCommit,
   Clock,
   CheckCircle,
@@ -21,25 +17,29 @@ import {
   ExternalLink,
   Calendar,
   Edit,
+  Building2
 } from "lucide-react";
 import Link from "next/link";
+
+interface RepositoryInfo {
+  owner: string;
+  name: string;
+  fullName: string;
+}
 
 interface PullRequestCardProps {
   pullRequest: PullRequest;
   userId: string;
+  repositoryInfo?: RepositoryInfo;
   className?: string;
 }
 
-export function PullRequestCard({
-  pullRequest,
-  userId,
-  className,
-}: PullRequestCardProps) {
+export function PullRequestCard({ pullRequest, userId, repositoryInfo, className }: PullRequestCardProps) {
   const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
+    return new Date(date).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
     });
   };
 
@@ -47,7 +47,7 @@ export function PullRequestCard({
     if (pullRequest.merged) {
       return <GitMerge className="h-4 w-4" />;
     }
-
+    
     switch (pullRequest.state) {
       case PullRequestState.OPEN:
         return <GitPullRequest className="h-4 w-4" />;
@@ -62,7 +62,7 @@ export function PullRequestCard({
     if (pullRequest.merged) {
       return "bg-purple-500/10 text-purple-600 dark:text-purple-400";
     }
-
+    
     switch (pullRequest.state) {
       case PullRequestState.OPEN:
         return "bg-green-500/10 text-green-600 dark:text-green-400";
@@ -75,7 +75,7 @@ export function PullRequestCard({
 
   const getMergeabilityBadge = () => {
     if (pullRequest.state !== PullRequestState.OPEN) return null;
-
+    
     if (pullRequest.mergeable === false) {
       return (
         <Badge variant="destructive" className="text-xs">
@@ -84,19 +84,16 @@ export function PullRequestCard({
         </Badge>
       );
     }
-
+    
     if (pullRequest.mergeable === true) {
       return (
-        <Badge
-          variant="default"
-          className="text-xs bg-green-500/10 text-green-600 dark:text-green-400"
-        >
+        <Badge variant="default" className="text-xs bg-green-500/10 text-green-600 dark:text-green-400">
           <CheckCircle className="h-3 w-3 mr-1" />
           Ready
         </Badge>
       );
     }
-
+    
     return (
       <Badge variant="secondary" className="text-xs">
         <AlertCircle className="h-3 w-3 mr-1" />
@@ -107,51 +104,65 @@ export function PullRequestCard({
 
   const getInitials = (name: string) => {
     return name
-      .split(" ")
-      .map((word) => word[0])
-      .join("")
+      .split(' ')
+      .map(word => word[0])
+      .join('')
       .toUpperCase()
       .slice(0, 2);
   };
 
+  // Get repository info from either prop or pullRequest object
+  const repoInfo = repositoryInfo || {
+    owner: pullRequest.base?.repo?.full_name?.split('/')[0] || 'unknown',
+    name: pullRequest.base?.repo?.name || 'unknown',
+    fullName: pullRequest.base?.repo?.full_name || 'unknown/unknown'
+  };
+
+  // Create the link with repository context - ALWAYS include owner and repo params
+  const pullRequestLink = `/${userId}/pull-requests/${pullRequest.number}?owner=${encodeURIComponent(repoInfo.owner)}&repo=${encodeURIComponent(repoInfo.name)}`;
+
+  // Safe access for branch information
+  const getHeadRef = () => pullRequest.head?.ref || 'unknown';
+  const getBaseRef = () => pullRequest.base?.ref || 'main';
+  const getComments = () => pullRequest.comments || 0;
+  const getCommits = () => pullRequest.commits || 0;
+  const getAdditions = () => pullRequest.additions || 0;
+  const getDeletions = () => pullRequest.deletions || 0;
+  const getLabels = () => pullRequest.labels || [];
+
   return (
-    <Card
-      className={`group hover:shadow-lg transition-all duration-200 ${className}`}
-    >
+    <Card className={`group hover:shadow-lg transition-all duration-200 ${className}`}>
       <CardHeader className="pb-3">
         <div className="flex items-start gap-3">
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <Badge
-                  variant="outline"
-                  className={`text-xs ${getStateColor()}`}
-                >
+              <div className="flex items-center gap-2 flex-wrap">
+                <Badge variant="outline" className={`text-xs ${getStateColor()}`}>
                   {getStateIcon()}
                   <span className="ml-1 capitalize">
-                    {pullRequest.merged ? "Merged" : pullRequest.state}
+                    {pullRequest.merged ? 'Merged' : pullRequest.state}
                   </span>
                 </Badge>
-
+                
                 {pullRequest.draft && (
                   <Badge variant="secondary" className="text-xs">
                     <Edit className="h-3 w-3 mr-1" />
                     Draft
                   </Badge>
                 )}
-
+                
                 {getMergeabilityBadge()}
               </div>
 
-              <Button
-                variant="ghost"
+              <Button 
+                variant="ghost" 
                 size="sm"
                 asChild
                 className="opacity-0 group-hover:opacity-100 transition-opacity"
               >
-                <a
-                  href={pullRequest.html_url}
-                  target="_blank"
+                <a 
+                  href={pullRequest.html_url} 
+                  target="_blank" 
                   rel="noopener noreferrer"
                 >
                   <ExternalLink className="h-4 w-4" />
@@ -159,15 +170,23 @@ export function PullRequestCard({
               </Button>
             </div>
 
-            <Link
-              href={`/${userId}/pull-requests/${pullRequest.number}`}
+            {/* Repository info */}
+            <div className="flex items-center gap-2 mb-2">
+              <Building2 className="h-3 w-3 text-muted-foreground" />
+              <span className="text-xs text-muted-foreground font-medium">
+                {repoInfo.fullName}
+              </span>
+            </div>
+
+            <Link 
+              href={pullRequestLink}
               className="block"
             >
               <h3 className="text-lg font-semibold group-hover:text-primary transition-colors line-clamp-2">
                 {pullRequest.title}
               </h3>
             </Link>
-
+            
             <p className="text-sm text-muted-foreground mt-1">
               #{pullRequest.number} opened {formatDate(pullRequest.created_at)}
             </p>
@@ -186,36 +205,36 @@ export function PullRequestCard({
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <Avatar className="h-6 w-6">
-                <AvatarImage
-                  src={pullRequest.user.avatar_url}
-                  alt={pullRequest.user.login}
+                <AvatarImage 
+                  src={pullRequest.user?.avatar_url} 
+                  alt={pullRequest.user?.login || 'Unknown'}
                 />
                 <AvatarFallback className="text-xs">
-                  {getInitials(pullRequest.user.login)}
+                  {getInitials(pullRequest.user?.login || 'Unknown')}
                 </AvatarFallback>
               </Avatar>
               <span className="text-sm text-muted-foreground">
-                {pullRequest.user.login}
+                {pullRequest.user?.login || 'Unknown'}
               </span>
             </div>
 
             <div className="flex items-center gap-4 text-sm text-muted-foreground">
               <div className="flex items-center gap-1">
                 <MessageSquare className="h-4 w-4" />
-                <span>{pullRequest.comments}</span>
+                <span>{getComments()}</span>
               </div>
-
+              
               <div className="flex items-center gap-1">
                 <GitCommit className="h-4 w-4" />
-                <span>{pullRequest.commits}</span>
+                <span>{getCommits()}</span>
               </div>
-
+              
               <div className="flex items-center gap-1 text-green-600 dark:text-green-400">
-                <span>+{pullRequest.additions}</span>
+                <span>+{getAdditions()}</span>
               </div>
-
+              
               <div className="flex items-center gap-1 text-red-600 dark:text-red-400">
-                <span>-{pullRequest.deletions}</span>
+                <span>-{getDeletions()}</span>
               </div>
             </div>
           </div>
@@ -231,33 +250,30 @@ export function PullRequestCard({
         {/* Branch Information */}
         <div className="flex items-center gap-2 mt-3 text-sm">
           <Badge variant="outline" className="text-xs font-mono">
-            {pullRequest.head.ref}
+            {getHeadRef()}
           </Badge>
           <span className="text-muted-foreground">→</span>
           <Badge variant="outline" className="text-xs font-mono">
-            {pullRequest.base.ref}
+            {getBaseRef()}
           </Badge>
         </div>
 
         {/* Labels */}
-        {pullRequest.labels.length > 0 && (
+        {getLabels().length > 0 && (
           <div className="flex flex-wrap gap-1 mt-3">
-            {pullRequest.labels.slice(0, 3).map((label) => (
-              <Badge
-                key={label.id}
-                variant="secondary"
+            {getLabels().slice(0, 3).map((label) => (
+              <Badge 
+                key={label.id} 
+                variant="secondary" 
                 className="text-xs px-2 py-1"
-                style={{
-                  backgroundColor: `#${label.color}20`,
-                  color: `#${label.color}`,
-                }}
+                style={{ backgroundColor: `#${label.color}20`, color: `#${label.color}` }}
               >
                 {label.name}
               </Badge>
             ))}
-            {pullRequest.labels.length > 3 && (
+            {getLabels().length > 3 && (
               <Badge variant="outline" className="text-xs px-2 py-1">
-                +{pullRequest.labels.length - 3}
+                +{getLabels().length - 3}
               </Badge>
             )}
           </div>
