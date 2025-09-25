@@ -1,9 +1,6 @@
-
-
-import { AnalysisType, ExecutionStatus} from './core.types';
-import { AnalysisResult } from './models.types';
-import { ExecutionResult } from './execution.types';
-import { MergeMethod } from '../github/automerge/automerge';
+import { AnalysisType, ExecutionStatus } from "./core.types";
+import { AnalysisResult } from "./models.types";
+import { ExecutionResult } from "./execution.types";
 
 // Analysis Request/Response
 export interface AnalysisRequest {
@@ -38,12 +35,16 @@ export interface AnalysisListResponse {
 
 // Execution Request/Response
 export interface ExecutionRequest {
+  analysis_id: string;
   recommendation_ids: string[];
-  create_pr?: boolean;
-  pr_title?: string;
-  target_branch?: string;
-  branch_name?: string;
-  auto_merge?: boolean;
+  repository_url: string;
+  execution_options: {
+    create_pr?: boolean;
+    pr_title?: string;
+    target_branch?: string;
+    branch_name?: string;
+    auto_merge?: boolean;
+  };
 }
 
 export interface ExecutionResponse {
@@ -52,17 +53,4 @@ export interface ExecutionResponse {
   branch_name?: string;
   message: string;
   progress_url: string;
-}
-
-// Auto-merge Request/Response
-export interface AutoMergeRequest {
-  repository_url: string;
-  merge_method: MergeMethod;
-  commit_message?: string;
-}
-
-export interface AutoMergeResponse {
-  merged: boolean;
-  message: string;
-  commit_sha?: string;
 }
