@@ -77,10 +77,13 @@ prepare_container_registry() {
         log_warning "Registry not found. Creating..."
         az acr create --name "$registry_name" \
                       --resource-group "$PROJECT_RESOURCE_GROUP" \
-                      --sku Basic --admin-enabled false
+                      --sku Basic --admin-enabled true
+    else
+        log_info "Enabling admin access on existing registry..."
+        az acr update --name "$registry_name" --admin-enabled true
     fi
 
-    log_info "Registry ready. Identity will be handled automatically by Container Apps."
+    log_info "Registry ready with admin access enabled."
 }
 
 prepare_container_apps_environment() {
@@ -98,9 +101,15 @@ prepare_container_apps_environment() {
 deploy_container_app() {
     local env_name="${ENVIRONMENT_PREFIX}-${PROJECT_PREFIX}-BackendContainerAppsEnv"
     local app_name="${ENVIRONMENT_PREFIX}-${PROJECT_PREFIX}-worker"
-    local registry_url="${ENVIRONMENT_PREFIX}${PROJECT_PREFIX}contregistry.azurecr.io"
+    local registry_name="${ENVIRONMENT_PREFIX}${PROJECT_PREFIX}contregistry"
+    local registry_url="${registry_name}.azurecr.io"
     local repo_url="https://github.com/dev-personal-projects/devops-ai-agent-client-worker"
     local branch="main"
+
+    log_info "Getting registry credentials..."
+    local registry_username registry_password
+    registry_username=$(az acr credential show --name "$registry_name" --query username -o tsv)
+    registry_password=$(az acr credential show --name "$registry_name" --query passwords[0].value -o tsv)
 
     log_info "Deploying: $app_name"
 
@@ -111,6 +120,8 @@ deploy_container_app() {
         --repo "$repo_url" \
         --branch "$branch" \
         --registry-server "$registry_url" \
+        --registry-username "$registry_username" \
+        --registry-password "$registry_password" \
         --ingress external \
         --target-port 8000 \
         --env-vars PROJECT_STAGE="${ENVIRONMENT_PREFIX}"
