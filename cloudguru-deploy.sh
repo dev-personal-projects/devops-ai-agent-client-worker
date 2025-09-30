@@ -46,7 +46,6 @@ validate_configuration() {
         "LOG_FOLDER"
         "PROJECT_RESOURCE_GROUP"
         "PROJECT_SUBSCRIPTION_ID"
-        "USER_ASSIGNED_IDENTITY_ID"
     )
     for var in "${required_vars[@]}"; do
         if [[ -z "${!var:-}" ]]; then
@@ -81,11 +80,7 @@ prepare_container_registry() {
                       --sku Basic --admin-enabled false
     fi
 
-    # Assign AcrPull role to the managed identity
-    az role assignment create \
-        --assignee "${USER_ASSIGNED_IDENTITY_ID}" \
-        --role AcrPull \
-        --scope "$(az acr show --name "$registry_name" --query id -o tsv)"
+    log_info "Registry ready. Identity will be handled automatically by Container Apps."
 }
 
 prepare_container_apps_environment() {
@@ -116,10 +111,8 @@ deploy_container_app() {
         --repo "$repo_url" \
         --branch "$branch" \
         --registry-server "$registry_url" \
-        --registry-identity "$USER_ASSIGNED_IDENTITY_ID" \
         --ingress external \
         --target-port 8000 \
-        --identity user_assigned="${USER_ASSIGNED_IDENTITY_ID}" \
         --env-vars PROJECT_STAGE="${ENVIRONMENT_PREFIX}"
 
     az containerapp update \
