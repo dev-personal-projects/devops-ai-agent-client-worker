@@ -46,7 +46,7 @@ class ApiClient extends BaseApiClient {
     if (!refreshToken) return false;
 
     try {
-      const response = await this.request<LoginResponse>("/auth/refresh", {
+      const response = await this.request<LoginResponse>("/refresh", {
         method: "POST",
         body: JSON.stringify({ refresh_token: refreshToken }),
       });
@@ -70,8 +70,8 @@ class ApiClient extends BaseApiClient {
     forceReauth: boolean = false
   ): Promise<ApiResponse<OAuthInitiateResponse>> {
     const endpoint = forceReauth
-      ? "/auth/oauth/github?force_reauth=true"
-      : "/auth/oauth/github";
+      ? "/oauth/github?force_reauth=true"
+      : "/oauth/github";
     return this.request<OAuthInitiateResponse>(endpoint);
   }
 
@@ -80,7 +80,7 @@ class ApiClient extends BaseApiClient {
     state?: string;
   }): Promise<ApiResponse<LoginResponse>> {
     const response = await this.request<LoginResponse>(
-      "/auth/oauth/github/callback",
+      "/oauth/github/callback",
       {
         method: "POST",
         body: JSON.stringify(payload),
@@ -100,15 +100,17 @@ class ApiClient extends BaseApiClient {
   }
 
   async linkGitHubAccount(
-    forceAccountSelection: boolean = false
+    forceReauth: boolean = false,
+    replace: boolean = false
   ): Promise<ApiResponse<OAuthInitiateResponse>> {
     const authError = this.requireAuth(this.tokenManager.getToken());
     if (authError) return authError;
 
-    const endpoint = forceAccountSelection
-      ? "/auth/oauth/github/link?force_reauth=true"
-      : "/auth/oauth/github/link";
-
+    const params = new URLSearchParams();
+    if (forceReauth) params.append("force_reauth", "true");
+    if (replace) params.append("replace", "true");
+    
+    const endpoint = `/oauth/github/link${params.toString() ? `?${params.toString()}` : ""}`;
     return this.requestWithAuth<OAuthInitiateResponse>(endpoint);
   }
 
@@ -116,7 +118,7 @@ class ApiClient extends BaseApiClient {
     const authError = this.requireAuth(this.tokenManager.getToken());
     if (authError) return authError;
 
-    return this.requestWithAuth<any>("/auth/oauth/github/info");
+    return this.requestWithAuth<any>("/oauth/github/info");
   }
 
   async updateGitHubAccount(): Promise<ApiResponse<OAuthInitiateResponse>> {
@@ -124,7 +126,7 @@ class ApiClient extends BaseApiClient {
     if (authError) return authError;
 
     return this.requestWithAuth<OAuthInitiateResponse>(
-      "/auth/oauth/github/update"
+      "/oauth/github/update"
     );
   }
 
@@ -133,7 +135,7 @@ class ApiClient extends BaseApiClient {
     if (authError) return authError;
 
     return this.requestWithAuth<{ message: string }>(
-      "/auth/oauth/github/disconnect",
+      "/oauth/github/disconnect",
       {
         method: "DELETE",
       }
@@ -141,11 +143,11 @@ class ApiClient extends BaseApiClient {
   }
 
   async getProfile(userId: string): Promise<ApiResponse<ProfileResponse>> {
-    return this.requestWithAuth<ProfileResponse>(`/auth/profile/${userId}`);
+    return this.requestWithAuth<ProfileResponse>(`/profile/${userId}`);
   }
 
   async getCurrentProfile(): Promise<ApiResponse<ProfileResponse>> {
-    return this.requestWithAuth<ProfileResponse>("/auth/profile");
+    return this.requestWithAuth<ProfileResponse>("/profile");
   }
 
   private saveUser(user: any) {
@@ -157,7 +159,7 @@ class ApiClient extends BaseApiClient {
   logout() {
     this.tokenManager.clearTokens();
     if (typeof window !== "undefined") {
-      window.location.href = "/auth/login";
+      window.location.href = "/login";
     }
   }
 
