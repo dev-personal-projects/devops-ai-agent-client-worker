@@ -423,7 +423,7 @@ export default function PullRequestsPage() {
       {/* Tabs */}
       <Tabs
         value={activeTab}
-        onValueChange={(value) => setActiveTab(value as any)}
+        onValueChange={(value) => setActiveTab(value as "open" | "closed" | "merged")}
       >
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="open" className="flex items-center gap-2">

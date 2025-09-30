@@ -171,7 +171,7 @@ export default function RepositoriesPage() {
           />
         </div>
         
-        <Select value={sortBy} onValueChange={(value) => setSortBy(value as any)}>
+        <Select value={sortBy} onValueChange={(value) => setSortBy(value as "updated" | "stars" | "forks" | "name")}>
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="Sort by" />
           </SelectTrigger>
@@ -183,7 +183,7 @@ export default function RepositoriesPage() {
           </SelectContent>
         </Select>
         
-        <Select value={filterBy} onValueChange={(value) => setFilterBy(value as any)}>
+        <Select value={filterBy} onValueChange={(value) => setFilterBy(value as "all" | "public" | "private" | "forked" | "archived")}>
           <SelectTrigger className="w-[140px]">
             <SelectValue placeholder="Filter" />
           </SelectTrigger>

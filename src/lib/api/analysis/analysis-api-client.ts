@@ -14,6 +14,7 @@ import {
   ExecutionSummary,
   AnalysisType,
 } from "@/types/analysis";
+import { MergeMethod } from "@/types/github/automerge/automerge";
 
 export class AnalysisApiClient {
   private tokenManager: TokenManager;
@@ -106,7 +107,7 @@ export class AnalysisApiClient {
     pullNumber: number,
     options: {
       repository_url: string;
-      merge_method: any;
+      merge_method: MergeMethod;
       commit_message?: string;
     }
   ) {

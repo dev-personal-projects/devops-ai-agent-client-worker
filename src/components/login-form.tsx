@@ -12,8 +12,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ChevronDown } from "lucide-react";
 import { Alert, AlertDescription } from "./ui/alert";
+import { Suspense } from "react";
 
-export function LoginForm({
+function LoginFormContent({
   className,
   ...props
 }: React.ComponentProps<"div">) {
@@ -103,6 +104,14 @@ export function LoginForm({
         </Link>
       </div>
     </div>
+  );
+}
+
+export function LoginForm(props: React.ComponentProps<"div">) {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <LoginFormContent {...props} />
+    </Suspense>
   );
 }
 
