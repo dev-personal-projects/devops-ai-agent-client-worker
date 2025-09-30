@@ -98,6 +98,26 @@ prepare_container_apps_environment() {
     fi
 }
 
+setup_service_principal() {
+    local sp_name="${ENVIRONMENT_PREFIX}-${PROJECT_PREFIX}-github-sp"
+    log_info "Setting up service principal for GitHub integration: $sp_name"
+    
+    # Check if service principal already exists
+    if az ad sp list --display-name "$sp_name" --query "[0].appId" -o tsv | grep -q "."; then
+        log_info "Service principal already exists"
+        return 0
+    fi
+    
+    # Create service principal with contributor role
+    log_info "Creating service principal..."
+    az ad sp create-for-rbac --name "$sp_name" \
+                             --role contributor \
+                             --scopes "/subscriptions/${PROJECT_SUBSCRIPTION_ID}/resourceGroups/${PROJECT_RESOURCE_GROUP}" \
+                             --sdk-auth > /dev/null
+    
+    log_success "Service principal created successfully"
+}
+
 deploy_container_app() {
     local env_name="${ENVIRONMENT_PREFIX}-${PROJECT_PREFIX}-BackendContainerAppsEnv"
     local app_name="${ENVIRONMENT_PREFIX}-${PROJECT_PREFIX}-worker"
@@ -150,6 +170,7 @@ main() {
     setup_azure_context
     prepare_container_registry
     prepare_container_apps_environment
+    setup_service_principal
     deploy_container_app
 
     log_success "Deployment complete"
