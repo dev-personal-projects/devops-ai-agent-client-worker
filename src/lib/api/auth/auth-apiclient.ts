@@ -78,6 +78,72 @@ class ApiClient extends BaseApiClient {
   }
 
   // ============================================
+  // AUTH METHODS
+  // ============================================
+
+  /**
+   * Sign up with email and password
+   */
+  async signup(payload: {
+    email: string;
+    password: string;
+    full_name: string;
+  }): Promise<ApiResponse<{ message: string; user: any }>> {
+    return this.request("/auth/signup", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  /**
+   * Login with email and password
+   */
+  async login(payload: {
+    email: string;
+    password: string;
+  }): Promise<ApiResponse<LoginResponse>> {
+    const response = await this.request<LoginResponse>("/auth/login", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+
+    // Save tokens and user data on successful authentication
+    if (response.data) {
+      this.tokenManager.setTokens(
+        response.data.access_token,
+        response.data.refresh_token
+      );
+      this.tokenManager.setUserCookie(response.data.user.id);
+      this.saveUser(response.data.user);
+    }
+
+    return response;
+  }
+
+  /**
+   * Logout user
+   */
+  async logout(): Promise<ApiResponse<{ message: string }>> {
+    const authError = this.requireAuth(this.tokenManager.getToken());
+    if (authError) return authError;
+
+    const response = await this.requestWithAuth<{ message: string }>(
+      "/auth/logout",
+      {
+        method: "POST",
+      }
+    );
+
+    // Clear tokens regardless of response
+    this.tokenManager.clearTokens();
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("user");
+    }
+
+    return response;
+  }
+
+  // ============================================
   // OAUTH METHODS
   // ============================================
 
@@ -104,7 +170,7 @@ class ApiClient extends BaseApiClient {
     state?: string;
   }): Promise<ApiResponse<LoginResponse>> {
     const response = await this.request<LoginResponse>(
-      "/auth/oauth/github/callback",
+      "/auth/oauth/github/callback/api",
       {
         method: "POST",
         body: JSON.stringify(payload),

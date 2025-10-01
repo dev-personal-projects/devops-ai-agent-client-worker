@@ -13,6 +13,7 @@ import {
 import { apiClient } from "@/lib/api/auth/auth-apiclient";
 import { getOAuthErrorMessage, GITHUB_OAUTH_ERRORS } from "@/types/auth/oauth";
 import { OAUTH_CONFIG } from "@/constants/oauth-constants";
+import { OAuthErrorBoundary, OAuthErrorDisplay } from "@/components/oauth-error-boundary";
 
 function CallbackHandler() {
   const searchParams = useSearchParams();
@@ -208,14 +209,16 @@ function CallbackHandler() {
 
 export default function CallbackPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex items-center justify-center min-h-screen">
-          <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        </div>
-      }
-    >
-      <CallbackHandler />
-    </Suspense>
+    <OAuthErrorBoundary context="login">
+      <Suspense
+        fallback={
+          <div className="flex items-center justify-center min-h-screen">
+            <Loader2 className="h-12 w-12 animate-spin text-primary" />
+          </div>
+        }
+      >
+        <CallbackHandler />
+      </Suspense>
+    </OAuthErrorBoundary>
   );
 }

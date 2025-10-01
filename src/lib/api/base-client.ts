@@ -1,9 +1,10 @@
 import { ApiResponse } from "@/types/auth/auth.types";
+import { env } from "@/config/env-config";
 
 export class BaseApiClient {
   protected baseURL: string;
 
-  constructor(baseURL: string = process.env.NEXT_PUBLIC_API_URL || "") {
+  constructor(baseURL: string = env.apiUrl) {
     this.baseURL = baseURL;
   }
 
@@ -23,9 +24,28 @@ export class BaseApiClient {
       headers.Authorization = `Bearer ${token}`;
     }
 
+    const requestOptions: RequestInit = {
+      ...options,
+      headers,
+      credentials: "include", // Include cookies for httpOnly tokens
+    };
+
+    // Add timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), env.apiTimeout);
+    requestOptions.signal = controller.signal;
+
     try {
-      const response = await fetch(url, { ...options, headers });
-      const data = await response.json();
+      const response = await fetch(url, requestOptions);
+      clearTimeout(timeoutId);
+      
+      let data;
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        data = await response.json();
+      } else {
+        data = { message: await response.text() };
+      }
 
       return {
         data: response.ok ? data : undefined,
@@ -33,6 +53,15 @@ export class BaseApiClient {
         status: response.status,
       };
     } catch (error) {
+      clearTimeout(timeoutId);
+      
+      if (error instanceof Error && error.name === "AbortError") {
+        return {
+          error: { detail: "Request timeout. Please try again." },
+          status: 408,
+        };
+      }
+      
       return {
         error: { detail: "Network error occurred" },
         status: 0,
