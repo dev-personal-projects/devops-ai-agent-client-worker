@@ -1,21 +1,33 @@
 "use client";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/api/utils/utils";
 import Link from "next/link";
 import { useGitHubOAuth } from "@/hooks/useGitHubOAuth";
+import { useAuth } from "@/hooks/useAuth";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Eye, EyeOff } from "lucide-react";
 import { Alert, AlertDescription } from "./ui/alert";
+import { Separator } from "./ui/separator";
 
 export function SignupForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
+  const [showPassword, setShowPassword] = useState(false);
+  const [formData, setFormData] = useState({
+    email: "",
+    password: "",
+    full_name: "",
+  });
+
   const {
     initiateGitHubLogin,
     isLoading: githubLoading,
@@ -23,12 +35,35 @@ export function SignupForm({
     clearError: clearGitHubError,
   } = useGitHubOAuth();
 
+  const {
+    signup,
+    isLoading: signupLoading,
+    error: signupError,
+    clearError: clearSignupError,
+  } = useAuth();
+
   const handleGitHubLogin = async (forceAccountSelection: boolean = false) => {
     clearGitHubError();
+    clearSignupError();
     await initiateGitHubLogin({
       forceAccountSelection,
     });
   };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    clearGitHubError();
+    clearSignupError();
+    
+    if (!formData.email || !formData.password || !formData.full_name) {
+      return;
+    }
+
+    await signup(formData);
+  };
+
+  const isLoading = githubLoading || signupLoading;
+  const error = githubError || signupError;
 
   return (
     <div
@@ -38,23 +73,24 @@ export function SignupForm({
       <div className="text-center space-y-2">
         <h1 className="text-2xl sm:text-3xl font-bold">Create your account</h1>
         <p className="text-muted-foreground text-sm sm:text-base">
-          Sign up with your GitHub account to get started
+          Sign up to get started with your DevOps AI Agent
         </p>
       </div>
 
-      {githubError && (
+      {error && (
         <Alert variant="destructive">
-          <AlertDescription>{githubError}</AlertDescription>
+          <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
       <div className="space-y-4">
+        {/* GitHub OAuth */}
         <div className="flex flex-col sm:flex-row gap-2">
           <Button
             variant="outline"
             className="flex-1 h-11"
             type="button"
-            disabled={githubLoading}
+            disabled={isLoading}
             onClick={() => handleGitHubLogin(false)}
           >
             <GitHubLogo className="mr-2 h-5 w-5" />
@@ -68,7 +104,7 @@ export function SignupForm({
                 size="icon"
                 className="h-11 w-11"
                 type="button"
-                disabled={githubLoading}
+                disabled={isLoading}
               >
                 <ChevronDown className="h-4 w-4" />
               </Button>
@@ -80,6 +116,82 @@ export function SignupForm({
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <Separator className="w-full" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-background px-2 text-muted-foreground">Or</span>
+          </div>
+        </div>
+
+        {/* Email/Password Form */}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="full_name">Full Name</Label>
+            <Input
+              id="full_name"
+              type="text"
+              placeholder="Enter your full name"
+              value={formData.full_name}
+              onChange={(e) => setFormData(prev => ({ ...prev, full_name: e.target.value }))}
+              disabled={isLoading}
+              required
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
+              type="email"
+              placeholder="Enter your email"
+              value={formData.email}
+              onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+              disabled={isLoading}
+              required
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="password">Password</Label>
+            <div className="relative">
+              <Input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                placeholder="Create a password"
+                value={formData.password}
+                onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                disabled={isLoading}
+                required
+                minLength={6}
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                onClick={() => setShowPassword(!showPassword)}
+                disabled={isLoading}
+              >
+                {showPassword ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
+          </div>
+          
+          <Button
+            type="submit"
+            className="w-full h-11"
+            disabled={isLoading}
+          >
+            {signupLoading ? "Creating account..." : "Create account"}
+          </Button>
+        </form>
       </div>
 
       <div className="text-center text-sm">

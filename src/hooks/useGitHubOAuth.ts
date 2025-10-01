@@ -1,6 +1,8 @@
 import { apiClient } from "@/lib/api/auth/auth-apiclient";
 import { useRouter } from "next/navigation";
 import { useState, useCallback } from "react";
+import { getOAuthErrorMessage } from "@/types/auth/oauth";
+import { OAUTH_CONFIG, getPostAuthRedirect } from "@/constants/oauth-constants";
 
 interface GitHubOAuthOptions {
   forceAccountSelection?: boolean;
@@ -24,8 +26,7 @@ export function useGitHubOAuth() {
             "github-logout",
             "width=500,height=600"
           );
-
-          await new Promise((resolve) => setTimeout(resolve, 1000));
+          await new Promise((resolve) => setTimeout(resolve, OAUTH_CONFIG.GITHUB_LOGOUT_DELAY_MS));
           logoutWindow?.close();
         }
 
@@ -34,26 +35,19 @@ export function useGitHubOAuth() {
         );
 
         if (response.error) {
-          setError(response.error.detail);
+          setError(getOAuthErrorMessage(response.error.detail));
           setIsLoading(false);
           return;
         }
 
         if (response.data) {
-          sessionStorage.setItem("github_oauth_state", response.data.state);
-          sessionStorage.setItem(
-            "github_oauth_timestamp",
-            Date.now().toString()
-          );
-
           if (options?.redirectTo) {
-            sessionStorage.setItem("github_oauth_redirect", options.redirectTo);
+            sessionStorage.setItem(OAUTH_CONFIG.STORAGE_KEYS.OAUTH_REDIRECT, options.redirectTo);
           }
-
           window.location.href = response.data.auth_url;
         }
-      } catch (error) {
-        setError(`Failed to initiate GitHub login: ${error}`);
+      } catch (err) {
+        setError(getOAuthErrorMessage("", "Failed to initiate GitHub login"));
         setIsLoading(false);
       }
     },
@@ -66,61 +60,25 @@ export function useGitHubOAuth() {
       setError(null);
 
       try {
-        const oauthState = sessionStorage.getItem("github_oauth_state");
-        const linkState = sessionStorage.getItem("github_link_state");
-        const oauthTimestamp = sessionStorage.getItem("github_oauth_timestamp");
-        const linkTimestamp = sessionStorage.getItem("github_link_timestamp");
-        const redirectTo = sessionStorage.getItem("github_oauth_redirect");
-
-        const isLinking = linkState === state;
-        const storedState = isLinking ? linkState : oauthState;
-        const storedTimestamp = isLinking ? linkTimestamp : oauthTimestamp;
-
-        if (!storedState || storedState !== state) {
-          setError("Invalid authentication state. Please try again.");
-          setIsLoading(false);
-          return false;
-        }
-
-        if (storedTimestamp) {
-          const age = Date.now() - parseInt(storedTimestamp);
-          if (age > 10 * 60 * 1000) {
-            setError("Authentication session expired. Please try again.");
-            setIsLoading(false);
-            return false;
-          }
-        }
-
+        const redirectTo = sessionStorage.getItem(OAUTH_CONFIG.STORAGE_KEYS.OAUTH_REDIRECT);
         const response = await apiClient.handleGitHubCallback({ code, state });
 
         if (response.error) {
-          setError(response.error.detail);
+          setError(getOAuthErrorMessage(response.error.detail));
           setIsLoading(false);
           return false;
         }
 
         if (response.data) {
-          if (isLinking) {
-            sessionStorage.removeItem("github_link_state");
-            sessionStorage.removeItem("github_link_timestamp");
-          } else {
-            sessionStorage.removeItem("github_oauth_state");
-            sessionStorage.removeItem("github_oauth_timestamp");
-            sessionStorage.removeItem("github_oauth_redirect");
-            const userData = apiClient.getUser();
-            const userId = userData?.id;
-            if (redirectTo) {
-              router.push(redirectTo);
-            } else if (userId) {
-              router.push(`/${userId}/dashboard`);
-            } else {
-              router.push("/dashboard");
-            }
-          }
+          sessionStorage.removeItem(OAUTH_CONFIG.STORAGE_KEYS.OAUTH_REDIRECT);
+          const userData = apiClient.getUser();
+          const userId = userData?.id;
+          const redirectUrl = getPostAuthRedirect(userId, redirectTo || undefined);
+          router.push(redirectUrl);
           return true;
         }
       } catch (err) {
-        setError("GitHub authentication failed. Please try again.");
+        setError(getOAuthErrorMessage("", "GitHub authentication failed"));
         setIsLoading(false);
       }
 

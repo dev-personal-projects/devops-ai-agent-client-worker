@@ -12,9 +12,33 @@ export class TokenManager {
 
   loadTokens() {
     if (typeof window !== "undefined") {
+      // Try to get from localStorage first (fallback)
       this.token = localStorage.getItem("access_token");
       this.refreshToken = localStorage.getItem("refresh_token");
+      
+      // Try to get from cookies (preferred for httpOnly)
+      const cookies = this.parseCookies();
+      if (cookies.access_token) {
+        this.token = cookies.access_token;
+      }
+      if (cookies.refresh_token) {
+        this.refreshToken = cookies.refresh_token;
+      }
     }
+  }
+
+  private parseCookies(): Record<string, string> {
+    if (typeof window === "undefined") return {};
+    
+    return document.cookie
+      .split(";")
+      .reduce((cookies, cookie) => {
+        const [name, value] = cookie.trim().split("=");
+        if (name && value) {
+          cookies[name] = decodeURIComponent(value);
+        }
+        return cookies;
+      }, {} as Record<string, string>);
   }
 
   setTokens(accessToken: string, refreshToken: string) {
@@ -22,20 +46,9 @@ export class TokenManager {
     this.refreshToken = refreshToken;
 
     if (typeof window !== "undefined") {
+      // Store in localStorage as fallback (backend sets httpOnly cookies)
       localStorage.setItem("access_token", accessToken);
       localStorage.setItem("refresh_token", refreshToken);
-
-      const secure = window.location.protocol === "https:";
-      const cookieOptions = `path=/; SameSite=strict${
-        secure ? "; Secure" : ""
-      }`;
-
-      document.cookie = `access_token=${accessToken}; max-age=${
-        60 * 60 * 24 * 7
-      }; ${cookieOptions}`;
-      document.cookie = `refresh_token=${refreshToken}; max-age=${
-        60 * 60 * 24 * 30
-      }; ${cookieOptions}`;
     }
   }
 
@@ -57,6 +70,7 @@ export class TokenManager {
       localStorage.removeItem("refresh_token");
       localStorage.removeItem("user");
 
+      // Clear client-side cookies (httpOnly cookies are cleared by backend)
       const expiredCookie = "; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;";
       document.cookie = `access_token=${expiredCookie}`;
       document.cookie = `refresh_token=${expiredCookie}`;
