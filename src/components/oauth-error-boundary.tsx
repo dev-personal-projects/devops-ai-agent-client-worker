@@ -72,7 +72,7 @@ export class OAuthErrorBoundary extends React.Component<
 
       // Default error UI
       const oauthError = handleOAuthError(this.state.error, this.props.context);
-      const actionText = getErrorActionText(oauthError, this.props.context === "update" || this.props.context === "disconnect" ? "login" : this.props.context);
+      const actionText = getErrorActionText(oauthError, this.props.context);
 
       return (
         <div className="flex items-center justify-center min-h-[400px] p-4">

@@ -164,7 +164,7 @@ export function isRetryableError(error: OAuthError): boolean {
 /**
  * Get action button text based on error
  */
-export function getErrorActionText(error: OAuthError, context: "login" | "linking" = "login"): string {
+export function getErrorActionText(error: OAuthError, context: "login" | "linking" | "update" | "disconnect" = "login"): string {
   switch (error.action) {
     case "retry":
       return "Try Again";
@@ -175,6 +175,6 @@ export function getErrorActionText(error: OAuthError, context: "login" | "linkin
     case "login":
       return "Back to Login";
     default:
-      return context === "linking" ? "Back to Dashboard" : "Back to Login";
+      return context === "linking" || context === "update" || context === "disconnect" ? "Back to Dashboard" : "Back to Login";
   }
 }

@@ -54,7 +54,7 @@ export class ErrorBoundary extends Component<Props, State> {
     return { 
       hasError: true, 
       error,
-      isOnline: navigator.onLine,
+      isOnline: typeof navigator !== 'undefined' ? navigator.onLine : true,
       copied: false
     };
   }
@@ -65,15 +65,19 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidMount() {
-    const updateOnlineStatus = () => this.setState({ isOnline: navigator.onLine });
-    window.addEventListener('online', updateOnlineStatus);
-    window.addEventListener('offline', updateOnlineStatus);
+    if (typeof window !== 'undefined') {
+      const updateOnlineStatus = () => this.setState({ isOnline: navigator.onLine });
+      window.addEventListener('online', updateOnlineStatus);
+      window.addEventListener('offline', updateOnlineStatus);
+    }
   }
 
   componentWillUnmount() {
-    const updateOnlineStatus = () => this.setState({ isOnline: navigator.onLine });
-    window.removeEventListener('online', updateOnlineStatus);
-    window.removeEventListener('offline', updateOnlineStatus);
+    if (typeof window !== 'undefined') {
+      const updateOnlineStatus = () => this.setState({ isOnline: navigator.onLine });
+      window.removeEventListener('online', updateOnlineStatus);
+      window.removeEventListener('offline', updateOnlineStatus);
+    }
   }
 
   private getErrorType(error: Error): ErrorType {
