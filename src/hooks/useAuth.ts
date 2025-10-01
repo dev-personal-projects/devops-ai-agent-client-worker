@@ -100,9 +100,7 @@ export function useAuth() {
       await apiClient.logout();
       router.push("/auth/login");
     } catch (err) {
-      // Still redirect to login even if logout fails
-      apiClient.logout(); // Clear local tokens
-      router.push("/auth/login");
+      apiClient.clearSession(); 
     }
   }, [router]);
 

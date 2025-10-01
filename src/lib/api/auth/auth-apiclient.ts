@@ -311,9 +311,9 @@ class ApiClient extends BaseApiClient {
   }
 
   /**
-   * Logout user and clear tokens
+   * Clear local tokens and redirect to login
    */
-  logout() {
+  clearSession() {
     this.tokenManager.clearTokens();
     if (typeof window !== "undefined") {
       localStorage.removeItem("user");
