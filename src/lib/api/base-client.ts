@@ -1,10 +1,9 @@
 import { ApiResponse } from "@/types/auth/auth.types";
-import { env } from "@/config/env-config";
 
 export class BaseApiClient {
   protected baseURL: string;
 
-  constructor(baseURL: string = env.apiUrl) {
+  constructor(baseURL: string = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000") {
     this.baseURL = baseURL;
   }
 
@@ -32,7 +31,7 @@ export class BaseApiClient {
 
     // Add timeout
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), env.apiTimeout);
+    const timeoutId = setTimeout(() => controller.abort(), parseInt(process.env.NEXT_PUBLIC_API_TIMEOUT || "30000", 10));
     requestOptions.signal = controller.signal;
 
     try {
