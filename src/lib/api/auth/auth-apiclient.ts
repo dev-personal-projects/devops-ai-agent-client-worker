@@ -57,7 +57,7 @@ class ApiClient extends BaseApiClient {
     if (!refreshToken) return false;
 
     try {
-      const response = await this.request<LoginResponse>("/auth/refresh", {
+      const response = await this.request<LoginResponse>("/refresh", {
         method: "POST",
         body: JSON.stringify({ refresh_token: refreshToken }),
       });
@@ -89,7 +89,7 @@ class ApiClient extends BaseApiClient {
     password: string;
     full_name: string;
   }): Promise<ApiResponse<{ message: string; user: any }>> {
-    return this.request("/auth/signup", {
+    return this.request("/signup", {
       method: "POST",
       body: JSON.stringify(payload),
     });
@@ -102,7 +102,7 @@ class ApiClient extends BaseApiClient {
     email: string;
     password: string;
   }): Promise<ApiResponse<LoginResponse>> {
-    const response = await this.request<LoginResponse>("/auth/login", {
+    const response = await this.request<LoginResponse>("/login", {
       method: "POST",
       body: JSON.stringify(payload),
     });
@@ -128,7 +128,7 @@ class ApiClient extends BaseApiClient {
     if (authError) return authError;
 
     const response = await this.requestWithAuth<{ message: string }>(
-      "/auth/logout",
+      "/logout",
       {
         method: "POST",
       }
@@ -157,7 +157,7 @@ class ApiClient extends BaseApiClient {
     const params = new URLSearchParams();
     if (forceReauth) params.append("force_reauth", "true");
     
-    const endpoint = `/auth/oauth/github${params.toString() ? `?${params.toString()}` : ""}`;
+    const endpoint = `/oauth/github${params.toString() ? `?${params.toString()}` : ""}`;
     return this.request<OAuthInitiateResponse>(endpoint);
   }
 
@@ -170,7 +170,7 @@ class ApiClient extends BaseApiClient {
     state?: string;
   }): Promise<ApiResponse<LoginResponse>> {
     const response = await this.request<LoginResponse>(
-      "/auth/oauth/github/callback/api",
+      "/oauth/github/callback/api",
       {
         method: "POST",
         body: JSON.stringify(payload),
@@ -205,7 +205,7 @@ class ApiClient extends BaseApiClient {
     if (forceReauth) params.append("force_reauth", "true");
     if (replace) params.append("replace", "true");
     
-    const endpoint = `/auth/oauth/github/link${params.toString() ? `?${params.toString()}` : ""}`;
+    const endpoint = `/oauth/github/link${params.toString() ? `?${params.toString()}` : ""}`;
     return this.requestWithAuth<OAuthInitiateResponse>(endpoint);
   }
 
@@ -223,7 +223,7 @@ class ApiClient extends BaseApiClient {
     const authError = this.requireAuth(this.tokenManager.getToken());
     if (authError) return authError;
 
-    return this.requestWithAuth("/auth/oauth/github/info");
+    return this.requestWithAuth("/oauth/github/info");
   }
 
   /**
@@ -235,7 +235,7 @@ class ApiClient extends BaseApiClient {
     if (authError) return authError;
 
     return this.requestWithAuth<OAuthInitiateResponse>(
-      "/auth/oauth/github/update"
+      "/oauth/github/update"
     );
   }
 
@@ -248,7 +248,7 @@ class ApiClient extends BaseApiClient {
     if (authError) return authError;
 
     return this.requestWithAuth<{ message: string }>(
-      "/auth/oauth/github/disconnect",
+      "/oauth/github/disconnect",
       {
         method: "DELETE",
       }
@@ -264,7 +264,7 @@ class ApiClient extends BaseApiClient {
    * Requires authentication
    */
   async getProfile(userId: string): Promise<ApiResponse<ProfileResponse>> {
-    return this.requestWithAuth<ProfileResponse>(`/auth/profile/${userId}`);
+    return this.requestWithAuth<ProfileResponse>(`/profile/${userId}`);
   }
 
   /**
@@ -272,7 +272,7 @@ class ApiClient extends BaseApiClient {
    * Requires authentication
    */
   async getCurrentProfile(): Promise<ApiResponse<ProfileResponse>> {
-    return this.requestWithAuth<ProfileResponse>("/auth/profile");
+    return this.requestWithAuth<ProfileResponse>("/profile");
   }
 
   /**
@@ -280,7 +280,7 @@ class ApiClient extends BaseApiClient {
    * Requires authentication
    */
   async updateProfile(updates: Partial<ProfileResponse>): Promise<ApiResponse<ProfileResponse>> {
-    return this.requestWithAuth<ProfileResponse>("/auth/profile", {
+    return this.requestWithAuth<ProfileResponse>("/profile", {
       method: "PUT",
       body: JSON.stringify(updates),
     });
