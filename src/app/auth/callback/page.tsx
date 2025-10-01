@@ -1,12 +1,18 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useGitHubOAuth } from "@/hooks/useGitHubOAuth";
-import { Suspense } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { AlertCircle, CheckCircle2, Loader2, Link } from "lucide-react";
+import {
+  AlertCircle,
+  CheckCircle2,
+  Loader2,
+  Link as LinkIcon,
+} from "lucide-react";
 import { apiClient } from "@/lib/api/auth/auth-apiclient";
+import { getOAuthErrorMessage, GITHUB_OAUTH_ERRORS } from "@/types/auth/oauth";
+import { OAUTH_CONFIG } from "@/constants/oauth-constants";
 
 function CallbackHandler() {
   const searchParams = useSearchParams();
@@ -14,7 +20,7 @@ function CallbackHandler() {
   const { handleCallback, isLoading, error } = useGitHubOAuth();
   const [processed, setProcessed] = useState(false);
   const [isLinking, setIsLinking] = useState(false);
-
+  
   useEffect(() => {
     if (processed) return;
 
@@ -23,51 +29,23 @@ function CallbackHandler() {
     const errorParam = searchParams.get("error");
     const errorDescription = searchParams.get("error_description");
 
-    const linkState = sessionStorage.getItem("github_link_state");
-    const linking = linkState === state;
-    setIsLinking(linking);
+    const redirectUrl = sessionStorage.getItem(OAUTH_CONFIG.STORAGE_KEYS.OAUTH_REDIRECT);
+    const isLinkingFlow = redirectUrl?.includes("/dashboard") ?? false;
+    setIsLinking(isLinkingFlow);
 
     if (errorParam) {
       setProcessed(true);
-
-      if (linking) {
-        sessionStorage.removeItem("github_link_state");
-        sessionStorage.removeItem("github_link_timestamp");
-      } else {
-        sessionStorage.removeItem("github_oauth_state");
-        sessionStorage.removeItem("github_oauth_timestamp");
-      }
       return;
     }
 
     if (code && state) {
       setProcessed(true);
+
       handleCallback(code, state).then((success) => {
         if (success) {
-          if (linking) {
-            sessionStorage.removeItem("github_link_state");
-            sessionStorage.removeItem("github_link_timestamp");
-            const userData = apiClient.getUser();
-            const userId = userData?.id;
-            if (userId) {
-              router.push(`/${userId}/dashboard?linked=true`);
-            } else {
-              router.push("/dashboard?linked=true");
-            }
-          } else {
-            sessionStorage.removeItem("github_oauth_state");
-            sessionStorage.removeItem("github_oauth_timestamp");
-            const userData = apiClient.getUser();
-            const userId = userData?.id;
-            if (userId) {
-              router.push(`/${userId}/dashboard`);
-            } else {
-              router.push("/dashboard");
-            }
-          }
         }
       });
-    } else if (!code) {
+    } else if (!code && !errorParam) {
       setProcessed(true);
     }
   }, [searchParams, handleCallback, processed, router]);
@@ -77,28 +55,29 @@ function CallbackHandler() {
     const errorDescription = searchParams.get("error_description");
     return (
       <div className="flex items-center justify-center min-h-screen p-4">
-        <div className="max-w-md w-full">
+        <div className="max-w-md w-full space-y-4">
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>
               {isLinking ? "GitHub Linking Failed" : "Authentication Failed"}
             </AlertTitle>
             <AlertDescription>
-              {githubError === "access_denied"
-                ? isLinking
-                  ? "You cancelled the GitHub account linking."
-                  : "You cancelled the GitHub authorization."
-                : errorDescription ||
-                  (isLinking
-                    ? "An error occurred while linking your GitHub account."
-                    : "An error occurred during GitHub authentication.")}
+              {getOAuthErrorMessage(githubError, errorDescription || "An error occurred during authentication.")}
             </AlertDescription>
           </Alert>
-          <div className="mt-4 text-center">
+          <div className="flex justify-center">
             <Button
-              onClick={() =>
-                router.push(isLinking ? "/dashboard" : "/auth/login")
-              }
+              onClick={() => {
+                const userData = apiClient.getUser();
+                const userId = userData?.id;
+                router.push(
+                  isLinking
+                    ? userId
+                      ? `/${userId}/dashboard`
+                      : "/dashboard"
+                    : "/auth/login"
+                );
+              }}
             >
               {isLinking ? "Back to Dashboard" : "Back to Login"}
             </Button>
@@ -111,16 +90,20 @@ function CallbackHandler() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
-          <h2 className="text-lg font-semibold mb-2">
-            {isLinking ? "Linking GitHub Account" : "Completing Authentication"}
-          </h2>
-          <p className="text-muted-foreground">
-            {isLinking
-              ? "Please wait while we link your GitHub account..."
-              : "Please wait while we verify your GitHub account..."}
-          </p>
+        <div className="text-center space-y-4">
+          <Loader2 className="h-12 w-12 animate-spin mx-auto text-primary" />
+          <div>
+            <h2 className="text-lg font-semibold mb-2">
+              {isLinking
+                ? "Linking GitHub Account"
+                : "Completing Authentication"}
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              {isLinking
+                ? "Please wait while we link your GitHub account..."
+                : "Please wait while we verify your GitHub account..."}
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -129,35 +112,41 @@ function CallbackHandler() {
   if (error) {
     return (
       <div className="flex items-center justify-center min-h-screen p-4">
-        <div className="max-w-md w-full">
+        <div className="max-w-md w-full space-y-4">
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>
               {isLinking ? "Linking Error" : "Authentication Error"}
             </AlertTitle>
-            <AlertDescription>
-              {error === "This GitHub account is already linked to another user"
-                ? "This GitHub account is already connected to a different user. Please use a different GitHub account."
-                : error}
+            <AlertDescription className="space-y-2">
+              <p>{error}</p>
+              {error.includes("already linked") && (
+                <p className="text-xs">
+                  This GitHub account is connected to a different user. Please
+                  use a different GitHub account or contact support.
+                </p>
+              )}
             </AlertDescription>
           </Alert>
-          <div className="mt-4 flex gap-2 justify-center">
+          <div className="flex gap-2 justify-center">
             <Button
               variant="outline"
               onClick={() => {
-                if (isLinking) {
-                  const userData = apiClient.getUser();
-                  const userId = userData?.id;
-                  router.push(userId ? `/${userId}/dashboard` : "/dashboard");
-                } else {
-                  router.push("/auth/login");
-                }
+                const userData = apiClient.getUser();
+                const userId = userData?.id;
+                router.push(
+                  isLinking
+                    ? userId
+                      ? `/${userId}/dashboard`
+                      : "/dashboard"
+                    : "/auth/login"
+                );
               }}
             >
               {isLinking ? "Back to Dashboard" : "Back to Login"}
             </Button>
             {!isLinking && (
-              <Button onClick={() => (window.location.href = "/auth/login")}>
+              <Button onClick={() => router.push("/auth/login")}>
                 Try Again
               </Button>
             )}
@@ -167,32 +156,34 @@ function CallbackHandler() {
     );
   }
 
+  // Success state
   if (processed && !error && !isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
+        <div className="text-center space-y-4">
           {isLinking ? (
             <>
-              <div className="flex justify-center mb-4">
-                <Link className="h-8 w-8 text-green-500" />
+              <LinkIcon className="h-12 w-12 text-green-500 mx-auto" />
+              <div>
+                <h2 className="text-lg font-semibold mb-2">
+                  GitHub Account Linked Successfully
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Your GitHub account has been connected. Redirecting...
+                </p>
               </div>
-              <h2 className="text-lg font-semibold mb-2">
-                GitHub Account Linked Successfully
-              </h2>
-              <p className="text-muted-foreground">
-                Your GitHub account has been connected. Redirecting to
-                dashboard...
-              </p>
             </>
           ) : (
             <>
-              <CheckCircle2 className="h-8 w-8 text-green-500 mx-auto mb-4" />
-              <h2 className="text-lg font-semibold mb-2">
-                Authentication Successful
-              </h2>
-              <p className="text-muted-foreground">
-                Redirecting to your dashboard...
-              </p>
+              <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto" />
+              <div>
+                <h2 className="text-lg font-semibold mb-2">
+                  Authentication Successful
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Redirecting to your dashboard...
+                </p>
+              </div>
             </>
           )}
         </div>
@@ -200,11 +191,12 @@ function CallbackHandler() {
     );
   }
 
+  // Initial processing state
   return (
     <div className="flex items-center justify-center min-h-screen">
-      <div className="text-center">
-        <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
-        <p className="text-muted-foreground">
+      <div className="text-center space-y-4">
+        <Loader2 className="h-12 w-12 animate-spin mx-auto text-primary" />
+        <p className="text-sm text-muted-foreground">
           {isLinking
             ? "Processing account linking..."
             : "Processing authentication..."}
@@ -219,7 +211,7 @@ export default function CallbackPage() {
     <Suspense
       fallback={
         <div className="flex items-center justify-center min-h-screen">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <Loader2 className="h-12 w-12 animate-spin text-primary" />
         </div>
       }
     >

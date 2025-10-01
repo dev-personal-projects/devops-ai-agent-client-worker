@@ -13,6 +13,7 @@ import {
 import { ChevronDown } from "lucide-react";
 import { Alert, AlertDescription } from "./ui/alert";
 import { Suspense } from "react";
+import { OAUTH_CONFIG } from "@/constants/oauth-constants";
 
 function LoginFormContent({
   className,
@@ -48,7 +49,7 @@ function LoginFormContent({
         </p>
       </div>
 
-      {searchParams.get("redirectTo") && (
+      {redirectTo !== "/dashboard" && (
         <Alert>
           <AlertDescription>Please login to access that page</AlertDescription>
         </Alert>
