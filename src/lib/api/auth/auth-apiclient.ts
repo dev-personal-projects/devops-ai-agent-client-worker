@@ -158,7 +158,7 @@ class ApiClient extends BaseApiClient {
     if (forceReauth) params.append("force_reauth", "true");
     
     const endpoint = `/oauth/github${params.toString() ? `?${params.toString()}` : ""}`;
-    return this.request<OAuthInitiateResponse>(endpoint);
+    return this.request<OAuthInitiateResponse>(endpoint, {}, undefined, false);
   }
 
   /**

@@ -3,14 +3,15 @@ import { ApiResponse } from "@/types/auth/auth.types";
 export class BaseApiClient {
   protected baseURL: string;
 
-  constructor(baseURL: string = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000") {
+  constructor(baseURL: string = process.env.NEXT_PUBLIC_API_URL || "") {
     this.baseURL = baseURL;
   }
 
   protected async request<T>(
     endpoint: string,
     options: RequestInit = {},
-    token?: string
+    token?: string,
+    includeCredentials: boolean = true
   ): Promise<ApiResponse<T>> {
     const url = `${this.baseURL}${endpoint}`;
 
@@ -26,7 +27,8 @@ export class BaseApiClient {
     const requestOptions: RequestInit = {
       ...options,
       headers,
-      credentials: "include", // Include cookies for httpOnly tokens
+      // Include credentials for cookie-based auth
+      ...(includeCredentials && { credentials: "include" }),
     };
 
     // Add timeout
