@@ -1,0 +1,12 @@
+{
+    "extends": ["next/core-web-vitals", "plugin:@typescript-eslint/recommended"],
+    "rules": {
+      "@typescript-eslint/ban-ts-comment": [
+        "error",
+        {
+          "banTypes": ["ts-ignore"],
+          "ban_TS-ignore": true
+        }
+      ]
+    }
+  }
