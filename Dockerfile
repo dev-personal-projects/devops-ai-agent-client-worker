@@ -23,7 +23,7 @@ COPY . .
 
 # Create necessary configuration files if they don't exist
 RUN if [ ! -f next.config.js ]; then \
-    echo "/** @type {import('next').NextConfig} */\nconst nextConfig = {};\nmodule.exports = nextConfig;" > next.config.js; \
+    echo "/** @type {import('next').NextConfig} */\nconst nextConfig = {};\nmodule.exports = nextConfig;" > next.config.ts; \
     fi
 
 RUN if [ ! -f tailwind.config.js ]; then \
