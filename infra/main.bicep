@@ -52,6 +52,12 @@ resource managedEnv 'Microsoft.App/managedEnvironments@2025-01-01' = {
     appLogsConfiguration: {
       destination: logsDestination
     }
+    workloadProfiles: [
+      {
+        workloadProfileType: 'Consumption'
+        name: 'Consumption'
+      }
+    ]
   }
   tags: tags
 }
