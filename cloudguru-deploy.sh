@@ -185,7 +185,7 @@ deploy_container_app() {
     --branch "$branch" \
     --registry-server "$registry_url" \
     --ingress external \
-    --target-port 8000
+    --target-port 3000
 
   log_info "Configuring Container App scaling and resources"
   az containerapp update \
