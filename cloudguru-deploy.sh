@@ -40,9 +40,63 @@ handle_error() {
 # Trap errors
 trap 'handle_error $LINENO "$BASH_COMMAND"' ERR
 
+# GitHub Secrets Management
+load_credentials_from_github_secrets() {
+    local repo_owner="${GITHUB_REPO_OWNER:-dev-personal-projects}"
+    local repo_name="${GITHUB_REPO_NAME:-devops-ai-agent-client-worker}"
+    
+    # Check if GitHub CLI is authenticated
+    if ! gh auth status &>/dev/null; then
+        return 1
+    fi
+    
+    # Try to get credentials from GitHub secrets
+    local client_id client_secret
+    if client_id=$(gh secret get SERVICE_PRINCIPAL_CLIENT_ID --repo "$repo_owner/$repo_name" 2>/dev/null) && \
+       client_secret=$(gh secret get SERVICE_PRINCIPAL_CLIENT_SECRET --repo "$repo_owner/$repo_name" 2>/dev/null); then
+        export SERVICE_PRINCIPAL_CLIENT_ID="$client_id"
+        export SERVICE_PRINCIPAL_CLIENT_SECRET="$client_secret"
+        log_success "Loaded service principal credentials from GitHub secrets"
+        return 0
+    fi
+    
+    return 1
+}
+
+save_credentials_to_github_secrets() {
+    local client_id="$1"
+    local client_secret="$2"
+    local repo_owner="${GITHUB_REPO_OWNER:-dev-personal-projects}"
+    local repo_name="${GITHUB_REPO_NAME:-devops-ai-agent-client-worker}"
+    
+    log_info "Saving service principal credentials to GitHub secrets..."
+    
+    # Check if GitHub CLI is authenticated
+    if ! gh auth status &>/dev/null; then
+        log_warning "GitHub CLI not authenticated. Please run 'gh auth login' first."
+        log_warning "Credentials will be displayed but not saved to GitHub secrets."
+        return 1
+    fi
+    
+    # Save credentials to GitHub secrets
+    if gh secret set SERVICE_PRINCIPAL_CLIENT_ID --body "$client_id" --repo "$repo_owner/$repo_name" 2>/dev/null; then
+        log_success "SERVICE_PRINCIPAL_CLIENT_ID saved to GitHub secrets"
+    else
+        log_warning "Failed to save SERVICE_PRINCIPAL_CLIENT_ID to GitHub secrets"
+    fi
+    
+    if gh secret set SERVICE_PRINCIPAL_CLIENT_SECRET --body "$client_secret" --repo "$repo_owner/$repo_name" 2>/dev/null; then
+        log_success "SERVICE_PRINCIPAL_CLIENT_SECRET saved to GitHub secrets"
+    else
+        log_warning "Failed to save SERVICE_PRINCIPAL_CLIENT_SECRET to GitHub secrets"
+    fi
+    
+    log_info "GitHub secrets updated for repository: $repo_owner/$repo_name"
+}
+
 # Check for required dependencies
 check_dependencies() {
-    local dependencies=("az" "jq")
+    local dependencies=("az" "jq" "gh")
     for dep in "${dependencies[@]}"; do
         if ! command -v "$dep" &>/dev/null; then
             log_error "$dep is not installed. Please install it and try again."
@@ -110,39 +164,75 @@ setup_service_principal() {
 
     # Use existing credentials if available
     if [[ -n "${SERVICE_PRINCIPAL_CLIENT_ID:-}" && -n "${SERVICE_PRINCIPAL_CLIENT_SECRET:-}" ]]; then
-        log_info "Using pre-configured service principal"
+        log_info "Using pre-configured service principal with Client ID: ${SERVICE_PRINCIPAL_CLIENT_ID}"
+        return 0
+    fi
+
+    # Try to load credentials from GitHub secrets
+    if load_credentials_from_github_secrets; then
+        log_info "Using service principal credentials from GitHub secrets with Client ID: ${SERVICE_PRINCIPAL_CLIENT_ID}"
         return 0
     fi
 
     log_info "Checking for service principal: $sp_name"
+    
+    # Check if service principal exists
+    local sp_exists=false
+    local app_id
     if az ad sp show --id "http://$sp_name" &>/dev/null; then
-        log_warning "Service principal exists but credentials not provided."
-        log_warning "Set SERVICE_PRINCIPAL_CLIENT_ID and SERVICE_PRINCIPAL_CLIENT_SECRET or reset credentials with:"
-        log_warning "az ad sp credential reset --name $sp_name"
-        exit 1
-    else
-        log_warning "Creating new service principal with required permissions..."
-        local sub_id=$PROJECT_SUBSCRIPTION_ID
-        local rg=$PROJECT_RESOURCE_GROUP
+        sp_exists=true
+        app_id=$(az ad sp show --id "http://$sp_name" --query appId -o tsv)
+        log_info "Service principal exists with App ID: $app_id"
         
-        # Create service principal with Contributor access
-        local sp_output
-        sp_output=$(az ad sp create-for-rbac --name "$sp_name" \
-            --scopes "/subscriptions/$sub_id/resourceGroups/$rg" \
-            --role "Contributor" \
-            --query "{appId: appId, password: password}" -o json)
+        # Try to get existing credentials
+        local credentials
+        if credentials=$(az ad sp credential list --id "$app_id" 2>/dev/null); then
+            # Check if we can find a valid secret
+            local secret_count=$(jq '. | length' <<< "$credentials" 2>/dev/null || echo "0")
+            if [[ "$secret_count" -gt 0 ]]; then
+                log_warning "Service principal exists but credentials are not accessible."
+                log_warning "Please reset credentials with:"
+                log_warning "az ad sp credential reset --id $app_id"
+            fi
+        fi
+    fi
+
+    # If credentials still not available, create new service principal
+    if [[ -z "${SERVICE_PRINCIPAL_CLIENT_ID:-}" || -z "${SERVICE_PRINCIPAL_CLIENT_SECRET:-}" ]]; then
+        if [[ "$sp_exists" == "true" ]]; then
+            log_warning "Resetting credentials for existing service principal..."
+            local sp_output
+            sp_output=$(az ad sp credential reset --id "$app_id" \
+                --query "{appId: appId, password: password}" -o json 2>/dev/null || \
+                az ad sp create-for-rbac --name "$sp_name" \
+                --scopes "/subscriptions/$PROJECT_SUBSCRIPTION_ID/resourceGroups/$PROJECT_RESOURCE_GROUP" \
+                --role "Contributor" \
+                --query "{appId: appId, password: password}" -o json)
+        else
+            log_warning "Creating new service principal with required permissions..."
+            local sp_output
+            sp_output=$(az ad sp create-for-rbac --name "$sp_name" \
+                --scopes "/subscriptions/$PROJECT_SUBSCRIPTION_ID/resourceGroups/$PROJECT_RESOURCE_GROUP" \
+                --role "Contributor" \
+                --query "{appId: appId, password: password}" -o json)
+        fi
 
         export SERVICE_PRINCIPAL_CLIENT_ID=$(jq -r '.appId' <<< "$sp_output")
         export SERVICE_PRINCIPAL_CLIENT_SECRET=$(jq -r '.password' <<< "$sp_output")
 
+        # Save credentials to GitHub secrets immediately
+        save_credentials_to_github_secrets "$SERVICE_PRINCIPAL_CLIENT_ID" "$SERVICE_PRINCIPAL_CLIENT_SECRET"
+
         # Assign ACR permissions
         local acr_id
         acr_id=$(az acr show --name "$registry_name" --query id -o tsv)
-        az role assignment create --assignee "$SERVICE_PRINCIPAL_CLIENT_ID" \
+        if ! az role assignment create --assignee "$SERVICE_PRINCIPAL_CLIENT_ID" \
             --role "AcrPush" \
-            --scope "$acr_id"
+            --scope "$acr_id" 2>/dev/null; then
+            log_info "ACR role assignment may already exist"
+        fi
 
-        log_success "Service principal created. Client ID: $SERVICE_PRINCIPAL_CLIENT_ID"
+        log_success "Service principal configured. Client ID: $SERVICE_PRINCIPAL_CLIENT_ID"
         log_warning "SAVE THESE CREDENTIALS IMMEDIATELY:"
         log_warning "Client Secret: $SERVICE_PRINCIPAL_CLIENT_SECRET"
     fi
@@ -185,7 +275,16 @@ deploy_container_app() {
     local repo_url="https://github.com/dev-personal-projects/devops-ai-agent-client-worker"
     local branch="main"
 
+    # Verify service principal credentials are available
+    if [[ -z "${SERVICE_PRINCIPAL_CLIENT_ID:-}" || -z "${SERVICE_PRINCIPAL_CLIENT_SECRET:-}" ]]; then
+        log_error "Service principal credentials are not available. Cannot deploy container app."
+        log_error "Please ensure setup_service_principal was called and exported credentials."
+        return 1
+    fi
+
     log_info "Deploying container app: $container_app_name"
+    
+    # Deploy container app with all parameters
     az containerapp up \
         --name "$container_app_name" \
         --resource-group "$PROJECT_RESOURCE_GROUP" \
