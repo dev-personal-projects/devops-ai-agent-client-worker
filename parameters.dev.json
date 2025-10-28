@@ -3,13 +3,13 @@
     "contentVersion": "1.0.0.0",
     "parameters": {
         "stage": {
-            "value": "client"
+            "value": "dev"
         },
         "environmentPrefix": {
-            "value": "client"
+            "value": "dev"
         },
         "projectPrefix": {
-            "value": "cli"
+            "value": "dv"
         },
         "location": {
             "value": "East US"

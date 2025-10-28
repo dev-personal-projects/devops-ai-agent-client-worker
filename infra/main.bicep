@@ -1,7 +1,7 @@
 targetScope = 'resourceGroup'
 
 @description('Stage/environment name.')
-@allowed(['dev','test','staging','prod','client'])
+@allowed(['dev','test','staging','prod','client','agent'])
 param stage string = 'dev'
 
 @description('Matches your ENVIRONMENT_PREFIX (e.g., "").')

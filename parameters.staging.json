@@ -3,19 +3,19 @@
     "contentVersion": "1.0.0.0",
     "parameters": {
         "stage": {
-            "value": "client"
+            "value": "staging"
         },
         "environmentPrefix": {
-            "value": "client"
+            "value": "staging"
         },
         "projectPrefix": {
-            "value": "cli"
+            "value": "stg"
         },
         "location": {
             "value": "East US"
         },
         "acrSku": {
-            "value": "Basic"
+            "value": "Standard"
         },
         "acrAdminEnabled": {
             "value": true
