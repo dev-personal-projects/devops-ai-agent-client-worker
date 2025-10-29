@@ -185,7 +185,7 @@ deploy_container_app() {
     --branch "$branch" \
     --registry-server "$registry_url" \
     --ingress external \
-    --target-port 8000
+    --target-port 3000
 
   log_info "Configuring Container App scaling and resources"
   az containerapp update \
@@ -205,6 +205,7 @@ main() {
   local timestamp
   timestamp=$(date +"%Y%m%d_%H%M%S")
   local log_file="${LOG_FOLDER}/deploy_worker_${timestamp}.log"
+  mkdir -p "$LOG_FOLDER"
   exec > >(tee -a "$log_file") 2>&1
 
   log_info "Starting Container App Deployment Workflow"
