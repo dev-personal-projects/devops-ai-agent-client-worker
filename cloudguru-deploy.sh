@@ -103,7 +103,7 @@ ensure_cli_prereqs() {
 provision_infra_bicep() {
   local infra_dir="${INFRA_DIR:-infra}"
   local template_file="${infra_dir}/main.bicep"
-  local params_file="parameters.${ENVIRONMENT_PREFIX}.json"
+  local params_file="${infra_dir}/parameters.${ENVIRONMENT_PREFIX}.json"
 
   if [[ ! -f "$template_file" ]]; then
     log_error "Bicep template not found at: $template_file"
@@ -185,7 +185,7 @@ deploy_container_app() {
     --branch "$branch" \
     --registry-server "$registry_url" \
     --ingress external \
-    --target-port 3000
+    --target-port 8000
 
   log_info "Configuring Container App scaling and resources"
   az containerapp update \
