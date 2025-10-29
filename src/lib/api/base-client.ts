@@ -3,7 +3,10 @@ import { ApiResponse } from "@/types/auth/auth.types";
 export class BaseApiClient {
   protected baseURL: string;
 
-  constructor(baseURL: string = process.env.NEXT_PUBLIC_API_URL || "") {
+  constructor(
+    baseURL: string = process.env.NEXT_PUBLIC_API_URL ||
+      "https://agent-ag-worker.ashycliff-a2e8a015.eastus.azurecontainerapps.io"
+  ) {
     this.baseURL = baseURL;
   }
 
@@ -33,13 +36,16 @@ export class BaseApiClient {
 
     // Add timeout
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), parseInt(process.env.NEXT_PUBLIC_API_TIMEOUT || "30000", 10));
+    const timeoutId = setTimeout(
+      () => controller.abort(),
+      parseInt(process.env.NEXT_PUBLIC_API_TIMEOUT || "30000", 10)
+    );
     requestOptions.signal = controller.signal;
 
     try {
       const response = await fetch(url, requestOptions);
       clearTimeout(timeoutId);
-      
+
       let data;
       const contentType = response.headers.get("content-type");
       if (contentType && contentType.includes("application/json")) {
@@ -55,14 +61,14 @@ export class BaseApiClient {
       };
     } catch (error) {
       clearTimeout(timeoutId);
-      
+
       if (error instanceof Error && error.name === "AbortError") {
         return {
           error: { detail: "Request timeout. Please try again." },
           status: 408,
         };
       }
-      
+
       return {
         error: { detail: "Network error occurred" },
         status: 0,
